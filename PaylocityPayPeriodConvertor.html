@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pay Period JSON &rarr; Excel Converter</title>
+<style>
+  :root{
+    --navy:#1F4E79; --navy-dk:#153A5B; --amber:#FFF2CC; --amber-bd:#E8C55B;
+    --blue-lt:#D9E1F2; --line:#DFE3E8; --ink:#1B2733; --muted:#667085;
+    --bg:#F4F6F8; --white:#fff; --red:#B42318; --red-bg:#FEF3F2;
+    --green:#067647; --green-bg:#ECFDF3; --amber-txt:#8A5D00; --amber-bg:#FFFAEB;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
+  header{background:var(--navy);color:#fff;padding:16px 28px}
+  header h1{margin:0;font-size:19px}
+  header p{margin:4px 0 0;font-size:12px;opacity:.85}
+  .wrap{max-width:1680px;margin:0 auto;padding:20px 24px 60px}
+
+  #drop{background:var(--white);border:2px dashed #B8C4D0;border-radius:8px;padding:34px;text-align:center;cursor:pointer;transition:.15s}
+  #drop:hover,#drop.over{border-color:var(--navy);background:#F0F5FA}
+  #drop h2{margin:0 0 6px;font-size:15px;color:var(--navy)}
+  #drop p{margin:0;color:var(--muted);font-size:12px}
+  #drop .big{font-size:30px;line-height:1;margin-bottom:10px}
+
+  .msg{margin-top:14px;padding:11px 14px;border-radius:6px;font-size:12.5px;line-height:1.5}
+  .msg.err{background:var(--red-bg);border:1px solid #FDA29B;color:var(--red)}
+  .msg.warn{background:var(--amber-bg);border:1px solid #FEC84B;color:var(--amber-txt)}
+  .msg.ok{background:var(--green-bg);border:1px solid #A6F4C5;color:var(--green)}
+  .msg b{display:block;margin-bottom:3px}
+  .msg ul{margin:5px 0 0 18px;padding:0}
+
+  .bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:18px 0 14px}
+  .bar .file{font-weight:bold;font-size:14px}
+  .bar .sub{color:var(--muted);font-size:12px;margin-top:2px}
+  .spacer{flex:1}
+  button{font-family:inherit;font-size:13px;border-radius:6px;cursor:pointer;padding:8px 15px;border:1px solid transparent}
+  .btn-primary{background:var(--navy);color:#fff}
+  .btn-primary:hover{background:var(--navy-dk)}
+  .btn-ghost{background:var(--white);border-color:#C5CDD6;color:var(--ink)}
+  .btn-ghost:hover{background:#EDF1F5}
+  #scopeWrap{display:flex;align-items:center;gap:6px;font-size:12px;color:#3E4C59;background:var(--white);
+             border:1px solid #C5CDD6;border-radius:6px;padding:7px 11px}
+  #scopeWrap.dim{opacity:.5}
+  #scopeWrap input{margin:0}
+
+  .card{background:var(--white);border:1px solid var(--line);border-radius:8px;margin-bottom:16px;overflow:hidden}
+  .card>h3{margin:0;padding:10px 16px;background:#F7F9FB;border-bottom:1px solid var(--line);font-size:13px;color:var(--navy)}
+  .kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+  .kv div{padding:10px 16px;border-bottom:1px solid #EFF2F5;border-right:1px solid #EFF2F5}
+  .kv span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
+  .kv b{font-size:13.5px}
+
+  .tabs{display:flex;gap:2px;border-bottom:2px solid var(--line)}
+  .tabs button{border:none;background:none;padding:10px 18px;font-size:13px;color:var(--muted);
+               border-bottom:2px solid transparent;margin-bottom:-2px;border-radius:0}
+  .tabs button.active{color:var(--navy);font-weight:bold;border-bottom-color:var(--navy)}
+
+  #toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--white);
+           border:1px solid var(--line);border-top:none;padding:9px 12px}
+  .searchbox{position:relative}
+  .searchbox input{width:290px;padding:7px 10px 7px 28px;border:1px solid #C5CDD6;border-radius:6px;font-family:inherit;font-size:12.5px}
+  .searchbox input:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 2px rgba(31,78,121,.12)}
+  .searchbox .ico{position:absolute;left:9px;top:7px;color:var(--muted);font-size:12px}
+  #status{color:var(--muted);font-size:12px}
+  #status b{color:var(--ink)}
+  .hint{color:var(--muted);font-size:11.5px}
+
+  .gridscroll{overflow:auto;max-height:62vh}
+  table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:12px;table-layout:fixed}
+  table.grid th{background:var(--navy);color:#fff;text-align:left;padding:7px 20px 7px 9px;position:sticky;top:0;z-index:3;
+                border-right:1px solid rgba(255,255,255,.18);border-bottom:1px solid var(--navy-dk);
+                white-space:nowrap;overflow:hidden;cursor:pointer;user-select:none;font-size:11.5px}
+  table.grid th.d{background:var(--navy-dk)}
+  table.grid th:hover{background:#2A5E8C}
+  .hlab{display:block;overflow:hidden;text-overflow:ellipsis}
+  .sortarrow{font-size:9px}
+  .fbtn{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.14);
+        border:none;color:#fff;font-size:8px;line-height:1;padding:3px 4px;border-radius:3px;cursor:pointer}
+  .fbtn:hover{background:rgba(255,255,255,.34)}
+  .fbtn.on{background:#FFC53D;color:#3A2A00}
+  .rsz{position:absolute;right:0;top:0;height:100%;width:5px;cursor:col-resize}
+  table.grid td{padding:5px 9px;border-bottom:1px solid #EFF2F5;border-right:1px solid #F3F5F7;
+                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--white)}
+  table.grid tbody tr:nth-child(even) td{background:#FBFCFD}
+  table.grid tbody tr:hover td{background:#EDF4FB}
+  table.grid td.d{background:var(--amber)}
+  table.grid tbody tr:nth-child(even) td.d{background:#FDF6DD}
+  table.grid tbody tr:hover td.d{background:#F6E9B8}
+  table.grid td.num{text-align:right;font-variant-numeric:tabular-nums}
+  table.grid td.empty{text-align:center;color:var(--muted);padding:26px;font-style:italic}
+  table.grid tfoot td{background:var(--blue-lt);font-weight:bold;position:sticky;bottom:0;z-index:2;
+                      border-top:2px solid #B6C4DC}
+  .tblwrap{background:var(--white);border:1px solid var(--line);border-top:none;border-radius:0 0 8px 8px;overflow:hidden}
+
+  .fpop{position:fixed;z-index:50;background:#fff;border:1px solid #C5CDD6;border-radius:7px;
+        box-shadow:0 10px 28px rgba(16,24,40,.18);width:262px;padding:8px;font-size:12.5px}
+  .fsort{display:flex;gap:5px;margin-bottom:7px}
+  .fsort button{flex:1;background:#F2F5F8;border:1px solid #DDE3EA;padding:6px;font-size:11.5px;border-radius:5px}
+  .fsort button:hover{background:#E6ECF2}
+  .fsearch{width:100%;padding:6px 8px;border:1px solid #DDE3EA;border-radius:5px;font-family:inherit;font-size:12.5px}
+  .fsearch:focus{outline:none;border-color:var(--navy)}
+  .fall{display:block;padding:7px 4px 5px;border-bottom:1px solid #EFF2F5}
+  .flist{max-height:208px;overflow:auto;margin:4px 0}
+  .flist label{display:flex;align-items:center;gap:6px;padding:4px;border-radius:4px;cursor:pointer}
+  .flist label:hover{background:#F2F6FA}
+  .flist label span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .flist label i{color:var(--muted);font-style:normal;font-size:11px}
+  .fnone{padding:14px;text-align:center;color:var(--muted)}
+  .fact{display:flex;align-items:center;gap:6px;padding-top:7px;border-top:1px solid #EFF2F5}
+  .fact .sp{flex:1}
+  .fact button{padding:6px 11px;font-size:12px;border:1px solid #DDE3EA;background:#fff;border-radius:5px}
+  .fact .fok{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .fact .fclear{color:var(--red)}
+
+  .legend{font-size:11.5px;color:var(--muted);margin:9px 2px 0}
+  .legend i{display:inline-block;width:11px;height:11px;background:var(--amber);border:1px solid var(--amber-bd);vertical-align:-1px;margin-right:4px}
+  .hidden{display:none}
+  .notes{padding:6px 18px 18px;max-height:62vh;overflow:auto}
+  .notes dt{font-weight:bold;margin-top:12px}
+  .notes dd{margin:2px 0 0;color:#3E4C59;line-height:1.55}
+</style>
+</head>
+<body>
+<header>
+  <h1>Pay Period JSON &rarr; Excel Converter</h1>
+  <p>Upload a PayPeriod export, review and filter it on screen, then download the formatted workbook.</p>
+</header>
+
+<div class="wrap">
+
+  <div id="drop">
+    <div class="big">&#8681;</div>
+    <h2>Drop your PayPeriod file here</h2>
+    <p>or click to browse &nbsp;&middot;&nbsp; accepts .txt and .json &nbsp;&middot;&nbsp; nothing leaves your computer</p>
+    <input type="file" id="fileInput" accept=".txt,.json,application/json,text/plain" class="hidden">
+  </div>
+
+  <div id="messages"></div>
+
+  <div id="result" class="hidden">
+    <div class="bar">
+      <div>
+        <div class="file" id="fileName"></div>
+        <div class="sub" id="fileStats"></div>
+      </div>
+      <div class="spacer"></div>
+      <div id="scopeWrap"><input type="checkbox" id="scope"><label for="scope" id="scopeLabel"></label></div>
+      <button class="btn-ghost" id="btnReset">Load another file</button>
+      <button class="btn-primary" id="btnExport">&#8681; Export to Excel (.xlsx)</button>
+    </div>
+
+    <div class="card">
+      <h3>Pay Period Info</h3>
+      <div class="kv" id="infoGrid"></div>
+    </div>
+
+    <div class="tabs">
+      <button data-tab="sum" class="active">Employee Summary</button>
+      <button data-tab="det">Job Detail</button>
+      <button data-tab="not">Field Notes &amp; Assumptions</button>
+    </div>
+
+    <div id="toolbar">
+      <div class="searchbox"><span class="ico">&#9906;</span>
+        <input type="text" id="search" placeholder="Search all columns&hellip;"></div>
+      <button class="btn-ghost" id="btnClear">Clear filters &amp; sort</button>
+      <div id="status"></div>
+      <div class="spacer"></div>
+      <div class="hint">Click a heading to sort &middot; &#9660; to filter &middot; drag the edge to resize</div>
+    </div>
+
+    <div class="tblwrap" id="pane-sum"></div>
+    <div class="tblwrap hidden" id="pane-det"></div>
+    <div class="tblwrap hidden" id="pane-not"><dl class="notes" id="notesList"></dl></div>
+
+    <div class="legend"><i></i> Shaded columns are calculated from the raw source values, not stored in the source file. Everything else is copied verbatim. Totals reflect the rows currently shown.</div>
+  </div>
+</div>
+
+<script>
+/*==CORE_START==*/
+
+/* ============================================================
+   CORE — pure functions, no DOM. Parsing + XLSX generation.
+   ============================================================ */
+
+var PAY_CODE_LABEL = {
+  NP: 'Base / regular rate',
+  OP: 'Overtime (1.5x base)',
+  DP: 'Double time (2x base)',
+  EP: 'Exception pay line'
+};
+
+function fmtDate8(s){
+  s = String(s == null ? '' : s);
+  return /^\d{8}$/.test(s) ? s.slice(4,6)+'/'+s.slice(6,8)+'/'+s.slice(0,4) : s;
+}
+function num(v){ var n = typeof v === 'number' ? v : parseFloat(v); return isFinite(n) ? n : 0; }
+function str(v){ return v == null ? '' : String(v); }
+function round(n,p){ var f = Math.pow(10,p); return Math.round(n*f)/f; }
+
+/* ---------- Parse ---------- */
+function parsePayPeriod(text){
+  var data;
+  try { data = JSON.parse(String(text).replace(/^\uFEFF/,'')); }
+  catch(e){ throw new Error('This file is not valid JSON. ' + e.message); }
+  if (!data || typeof data !== 'object' || Array.isArray(data))
+    throw new Error('Expected a JSON object at the top level of the file.');
+  if (!Array.isArray(data.empDetailArray))
+    throw new Error('No "empDetailArray" found. This does not look like a PayPeriod export.');
+
+  var warnings = [];
+  var meta = {
+    siteName:        str(data.siteName),
+    partnerSiteID:   str(data.partnerSiteID),
+    payPeriodID:     str(data.payPeriodID),
+    startDate:       fmtDate8(data.payRollStartDate),
+    endDate:         fmtDate8(data.payRollEndDate),
+    createdAt:       str(data.createdAt),
+    lastModifiedAt:  str(data.lastModifiedAt)
+  };
+  ['siteName','payPeriodID','startDate','endDate'].forEach(function(k){
+    if (!meta[k]) warnings.push('Header field "'+k+'" is missing or empty in the source file; it is left blank rather than guessed.');
+  });
+
+  var detail = [], employees = [], line = 0;
+
+  data.empDetailArray.forEach(function(e, ei){
+    e = e || {};
+    var jobs = Array.isArray(e.jobDetailArray) ? e.jobDetailArray : [];
+    if (!Array.isArray(e.jobDetailArray))
+      warnings.push('Employee #'+(ei+1)+' ('+str(e.firstName)+' '+str(e.lastName)+') has no jobDetailArray; the employee row is kept with zero hours.');
+
+    var emp = {
+      firstName: str(e.firstName), lastName: str(e.lastName),
+      empID: str(e.empID), payrollID: str(e.payrollID), empPK: str(e.primaryKey),
+      ccTipsRaw: num(e.payrollCCTips), cashTipsRaw: num(e.payrollCashTips),
+      hours:{NP:0,OP:0,DP:0,EP:0}, otherHours:0, wages:0
+    };
+
+    var byCode = {};
+    jobs.forEach(function(j){
+      j = j || {};
+      line++;
+      var minutes = num(j.minutes), rateRaw = num(j.hourlyRate), code = str(j.payCode);
+      var row = {
+        line: line, _ei: ei,
+        firstName: emp.firstName, lastName: emp.lastName, empID: emp.empID,
+        payrollID: emp.payrollID, empPK: emp.empPK,
+        payCode: code, jobDesc: str(j.jobDesc), jobCodeID: str(j.jobCodeID),
+        minutes: minutes, rateRaw: rateRaw, jobPK: str(j.primaryKey)
+      };
+      row.hours  = minutes / 60;
+      row.rate   = rateRaw / 100;
+      row.amount = row.hours * row.rate;
+      detail.push(row);
+
+      if (emp.hours[code] !== undefined) emp.hours[code] += row.hours;
+      else { emp.otherHours += row.hours; if (code) warnings.push('Unrecognised pay code "'+code+'" on line '+line+' ('+emp.firstName+' '+emp.lastName+'). The row is included in full and counted in Total Hours.'); }
+      emp.wages += row.amount;
+      if (code) (byCode[code] = byCode[code] || []).push(rateRaw);
+    });
+
+    // sanity check the cents assumption via the OP/DP multipliers.
+    // An employee may hold several jobs at different base rates, so each OP/DP
+    // rate only has to match SOME NP rate on that employee, not the first one.
+    if (byCode.NP && byCode.NP.length){
+      var bases = byCode.NP;
+      function matchesAny(rate, mult){
+        return bases.some(function(np){ return Math.abs(rate - np*mult) <= 0.01; });
+      }
+      var bad = (byCode.OP||[]).some(function(r){ return !matchesAny(r, 1.5); })
+             || (byCode.DP||[]).some(function(r){ return !matchesAny(r, 2);   });
+      if (bad) warnings.push('Rate multipliers for '+emp.firstName+' '+emp.lastName+' do not follow OP = 1.5x NP / DP = 2x NP against any of that employee\'s base rates. Raw rates are still exported exactly as stored — double-check the dollar conversion for this employee.');
+    }
+
+    emp.totalHours = emp.hours.NP + emp.hours.OP + emp.hours.DP + emp.hours.EP + emp.otherHours;
+    emp.ccTips = emp.ccTipsRaw / 100;
+    emp.cashTips = emp.cashTipsRaw / 100;
+    emp.totalPay = emp.wages + emp.ccTips + emp.cashTips;
+    employees.push(emp);
+  });
+
+  if (!detail.length) warnings.push('The file contains no job detail rows at all.');
+
+  return { meta: meta, employees: employees, detail: detail, warnings: warnings };
+}
+
+/* ---------- Rebuild a model from a subset of detail rows ----------
+   Used when the user exports only the rows currently visible after
+   filtering. Employee totals are recomputed from the kept rows so the
+   reconciliation cells still balance; employees with no remaining rows
+   drop out entirely. Tips are employee-level in the source and are
+   carried over in full for every employee that survives the filter. */
+function deriveFilteredModel(base, keptDetail, filterNote){
+  var byEmp = {};
+  keptDetail.forEach(function(r){ (byEmp[r._ei] = byEmp[r._ei] || []).push(r); });
+
+  var employees = [];
+  base.employees.forEach(function(src, ei){
+    var rows = byEmp[ei];
+    if (!rows) return;
+    var e = {
+      firstName: src.firstName, lastName: src.lastName, empID: src.empID,
+      payrollID: src.payrollID, empPK: src.empPK,
+      ccTipsRaw: src.ccTipsRaw, cashTipsRaw: src.cashTipsRaw,
+      hours:{NP:0,OP:0,DP:0,EP:0}, otherHours:0, wages:0
+    };
+    rows.forEach(function(r){
+      if (e.hours[r.payCode] !== undefined) e.hours[r.payCode] += r.hours;
+      else e.otherHours += r.hours;
+      e.wages += r.amount;
+    });
+    e.totalHours = e.hours.NP + e.hours.OP + e.hours.DP + e.hours.EP + e.otherHours;
+    e.ccTips = e.ccTipsRaw / 100;
+    e.cashTips = e.cashTipsRaw / 100;
+    e.totalPay = e.wages + e.ccTips + e.cashTips;
+    employees.push(e);
+  });
+
+  return {
+    meta: base.meta,
+    employees: employees,
+    detail: keptDetail,
+    warnings: base.warnings.slice(),
+    filterNote: filterNote
+  };
+}
+
+/* ---------- Column definitions (shared by UI and Excel) ---------- */
+var DETAIL_COLS = [
+  {h:'Line #',               w:8,  key:'line',      t:'n', s:4},
+  {h:'First Name',           w:14, key:'firstName', t:'s', s:4},
+  {h:'Last Name',            w:16, key:'lastName',  t:'s', s:4},
+  {h:'Employee ID',          w:13, key:'empID',     t:'s', s:5},
+  {h:'Payroll ID',           w:12, key:'payrollID', t:'s', s:5},
+  {h:'Employee Primary Key', w:19, key:'empPK',     t:'s', s:5},
+  {h:'Pay Code',             w:10, key:'payCode',   t:'s', s:4},
+  {h:'Job Description',      w:26, key:'jobDesc',   t:'s', s:4},
+  {h:'Job Code ID',          w:12, key:'jobCodeID', t:'s', s:5},
+  {h:'Minutes (raw)',        w:13, key:'minutes',   t:'n', s:6,  fmt:'int',   sum:true},
+  {h:'Hourly Rate (raw)',    w:16, key:'rateRaw',   t:'n', s:7,  fmt:'raw'},
+  {h:'Job Primary Key',      w:16, key:'jobPK',     t:'s', s:5},
+  {h:'Hours',                w:10, key:'hours',     t:'n', s:8,  fmt:'hrs',   sum:true, d:true, f:function(r){return 'J'+r+'/60';}},
+  {h:'Hourly Rate ($)',      w:14, key:'rate',      t:'n', s:9,  fmt:'money', d:true, f:function(r){return 'K'+r+'/100';}},
+  {h:'Amount ($)',           w:13, key:'amount',    t:'n', s:9,  fmt:'money', sum:true, d:true, f:function(r){return 'M'+r+'*N'+r;}}
+];
+
+var SUMMARY_COLS = [
+  {h:'#',                    w:6,  key:'n',           t:'n', s:4},
+  {h:'First Name',           w:14, key:'firstName',   t:'s', s:4},
+  {h:'Last Name',            w:16, key:'lastName',    t:'s', s:4},
+  {h:'Employee ID',          w:13, key:'empID',       t:'s', s:5},
+  {h:'Payroll ID',           w:12, key:'payrollID',   t:'s', s:5},
+  {h:'Employee Primary Key', w:19, key:'empPK',       t:'s', s:5},
+  {h:'CC Tips (raw)',        w:13, key:'ccTipsRaw',   t:'n', s:6, fmt:'int', sum:true},
+  {h:'Cash Tips (raw)',      w:14, key:'cashTipsRaw', t:'n', s:6, fmt:'int', sum:true},
+  {h:'NP Hours',   w:11, key:'hNP', sum:true,        t:'n', s:8, fmt:'hrs',   d:true, f:function(r,R){return SUMIF_H(r,R,'NP');}},
+  {h:'OP Hours',   w:11, key:'hOP', sum:true,        t:'n', s:8, fmt:'hrs',   d:true, f:function(r,R){return SUMIF_H(r,R,'OP');}},
+  {h:'DP Hours',   w:11, key:'hDP', sum:true,        t:'n', s:8, fmt:'hrs',   d:true, f:function(r,R){return SUMIF_H(r,R,'DP');}},
+  {h:'EP Hours',   w:11, key:'hEP', sum:true,        t:'n', s:8, fmt:'hrs',   d:true, f:function(r,R){return SUMIF_H(r,R,'EP');}},
+  {h:'Total Hours',w:12, key:'totalHours', sum:true, t:'n', s:8, fmt:'hrs',   d:true, f:function(r,R){return 'SUMIFS('+R.hrs+','+R.pk+',$F'+r+')';}},
+  {h:'Wages ($)',  w:13, key:'wages', sum:true,      t:'n', s:9, fmt:'money', d:true, f:function(r,R){return 'SUMIFS('+R.amt+','+R.pk+',$F'+r+')';}},
+  {h:'CC Tips ($)',w:12, key:'ccTips', sum:true,     t:'n', s:9, fmt:'money', d:true, f:function(r){return 'G'+r+'/100';}},
+  {h:'Cash Tips ($)',w:13,key:'cashTips', sum:true,  t:'n', s:9, fmt:'money', d:true, f:function(r){return 'H'+r+'/100';}},
+  {h:'Total Pay ($)',w:14, key:'totalPay', sum:true, t:'n', s:9, fmt:'money', d:true, f:function(r){return 'N'+r+'+O'+r+'+P'+r;}}
+];
+var SUMIF_CTX = null;
+function SUMIF_H(r,R,code){ return 'SUMIFS('+R.hrs+','+R.pk+',$F'+r+','+R.code+',"'+code+'")'; }
+
+var FIELD_NOTES = [
+  ['Raw field: hourlyRate',
+   'Stored in the source as CENTS. Example: 2085 = $20.85/hr. The converter verifies this per employee by checking that the OP rate is 1.5x the NP rate and the DP rate is 2x the NP rate, and warns you if any employee breaks the pattern.'],
+  ['Raw field: minutes',
+   'Total minutes worked or paid for that pay code + job combination in this pay period.'],
+  ['Raw fields: payrollCCTips / payrollCashTips',
+   'Stored in the source as CENTS. Example: 8227 = $82.27. These are employee-level totals, not per-job.'],
+  ['Derived: Hours',
+   'Minutes / 60. Written into the workbook as a live formula, not a pasted value.'],
+  ['Derived: Hourly Rate ($)',
+   'Hourly Rate (raw) / 100.'],
+  ['Derived: Amount ($)',
+   'Hours x Hourly Rate ($). This is a straight-line calculation from the two source fields. It is NOT taken from the source file (the source carries no amount field), so it will not reflect premium or blended-rate handling. Verify against payroll before using it to pay anyone.'],
+  ['Pay code legend (inferred)',
+   'NP = base/regular rate | OP = overtime, 1.5x base | DP = double time, 2x base | EP = exception pay line (e.g. CA Meal Premium, FLSA Qualified Overtime). Inferred from the rate ratios and the jobDesc values; the source file does not define these codes. Any other pay code found in a file is exported in full and flagged as a warning.'],
+  ['Zero-minute rows',
+   'Rows where minutes = 0 are kept exactly as they appear in the source. They are real source records and are never dropped.'],
+  ['IDs',
+   'empID, payrollID, jobCodeID and all primaryKey values are written as text so no leading characters or digits are altered. jobCodeID is alphanumeric in some rows (e.g. FQOT).'],
+  ['Reconciliation',
+   'The Employee Summary sheet totals its hours and wages out of the Job Detail sheet with SUMIFS. Two check cells under the summary table subtract the two sheet totals; both must read 0.00, which proves no detail row was dropped or double-counted.']
+];
+
+/* ============================================================
+   Minimal XLSX writer (no external libraries)
+   ============================================================ */
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                  .replace(/"/g,'&quot;').replace(/\r/g,'');
+}
+function colLetter(n){ var s=''; while(n>0){ var m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=(n-m-1)/26; } return s; }
+
+/* cell: {v, t:'s'|'n', s:styleIndex, f:'FORMULA'} */
+function cellXml(ref, c){
+  if (c == null || c.v === undefined || c.v === null || c.v === '') {
+    return c && c.s !== undefined ? '<c r="'+ref+'" s="'+c.s+'"/>' : '';
+  }
+  var s = c.s !== undefined ? ' s="'+c.s+'"' : '';
+  if (c.f !== undefined){
+    var v = (typeof c.v === 'number' && isFinite(c.v)) ? '<v>'+round(c.v,10)+'</v>' : '';
+    return '<c r="'+ref+'"'+s+'><f>'+esc(c.f)+'</f>'+v+'</c>';
+  }
+  if (c.t === 'n') return '<c r="'+ref+'"'+s+'><v>'+round(num(c.v),10)+'</v></c>';
+  return '<c r="'+ref+'"'+s+' t="inlineStr"><is><t xml:space="preserve">'+esc(c.v)+'</t></is></c>';
+}
+
+/* sheet: {rows:[{h:height, cells:[cell|null,...]}], cols:[widths], freeze:rowCount, filter:'A4:O65'} */
+function sheetXml(sheet){
+  var x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
+  var maxC = 1;
+  sheet.rows.forEach(function(r){ if (r && r.cells.length > maxC) maxC = r.cells.length; });
+  x += '<dimension ref="A1:'+colLetter(maxC)+Math.max(1,sheet.rows.length)+'"/>';
+  x += '<sheetViews><sheetView workbookViewId="0">';
+  if (sheet.freeze) x += '<pane ySplit="'+sheet.freeze+'" topLeftCell="A'+(sheet.freeze+1)+'" activePane="bottomLeft" state="frozen"/>';
+  x += '</sheetView></sheetViews><sheetFormatPr defaultRowHeight="14.5"/>';
+  if (sheet.cols && sheet.cols.length){
+    x += '<cols>';
+    sheet.cols.forEach(function(w,i){ x += '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>'; });
+    x += '</cols>';
+  }
+  x += '<sheetData>';
+  sheet.rows.forEach(function(r,ri){
+    if (!r) return;
+    var n = ri+1, body = '';
+    r.cells.forEach(function(c,ci){ body += cellXml(colLetter(ci+1)+n, c); });
+    if (!body && !r.h) return;
+    x += '<row r="'+n+'"'+(r.h ? ' ht="'+r.h+'" customHeight="1"' : '')+'>'+body+'</row>';
+  });
+  x += '</sheetData>';
+  if (sheet.filter) x += '<autoFilter ref="'+sheet.filter+'"/>';
+  x += '</worksheet>';
+  return x;
+}
+
+function stylesXml(){
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+  + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+  + '<numFmts count="5">'
+  +   '<numFmt numFmtId="164" formatCode="#,##0"/>'
+  +   '<numFmt numFmtId="165" formatCode="#,##0.00"/>'
+  +   '<numFmt numFmtId="166" formatCode="&quot;$&quot;#,##0.00"/>'
+  +   '<numFmt numFmtId="167" formatCode="#,##0.0#"/>'
+  +   '<numFmt numFmtId="168" formatCode="@"/>'
+  + '</numFmts>'
+  + '<fonts count="5">'
+  +   '<font><sz val="10"/><name val="Arial"/><family val="2"/></font>'
+  +   '<font><b/><sz val="10"/><name val="Arial"/><family val="2"/></font>'
+  +   '<font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Arial"/><family val="2"/></font>'
+  +   '<font><b/><sz val="13"/><color rgb="FF1F4E79"/><name val="Arial"/><family val="2"/></font>'
+  +   '<font><i/><sz val="9"/><color rgb="FF808080"/><name val="Arial"/><family val="2"/></font>'
+  + '</fonts>'
+  + '<fills count="5">'
+  +   '<fill><patternFill patternType="none"/></fill>'
+  +   '<fill><patternFill patternType="gray125"/></fill>'
+  +   '<fill><patternFill patternType="solid"><fgColor rgb="FF1F4E79"/><bgColor indexed="64"/></patternFill></fill>'
+  +   '<fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill>'
+  +   '<fill><patternFill patternType="solid"><fgColor rgb="FFD9E1F2"/><bgColor indexed="64"/></patternFill></fill>'
+  + '</fills>'
+  + '<borders count="2">'
+  +   '<border><left/><right/><top/><bottom/><diagonal/></border>'
+  +   '<border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right>'
+  +   '<top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border>'
+  + '</borders>'
+  + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+  + '<cellXfs count="20">'
+  +   '<xf numFmtId="0"   fontId="0" fillId="0" borderId="0" xfId="0"/>'                                      /* 0  base            */
+  +   '<xf numFmtId="0"   fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>'                        /* 1  title           */
+  +   '<xf numFmtId="0"   fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1"/>'                        /* 2  note            */
+  +   '<xf numFmtId="0"   fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' /* 3 header */
+  +   '<xf numFmtId="0"   fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>'                      /* 4  data general    */
+  +   '<xf numFmtId="168" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="left"/></xf>' /* 5 data text */
+  +   '<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyNumberFormat="1"/>'/* 6  data int        */
+  +   '<xf numFmtId="167" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyNumberFormat="1"/>'/* 7  data raw rate   */
+  +   '<xf numFmtId="165" fontId="0" fillId="3" borderId="1" xfId="0" applyBorder="1" applyFill="1" applyNumberFormat="1"/>' /* 8  derived hours */
+  +   '<xf numFmtId="166" fontId="0" fillId="3" borderId="1" xfId="0" applyBorder="1" applyFill="1" applyNumberFormat="1"/>' /* 9  derived money */
+  +   '<xf numFmtId="0"   fontId="1" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>'         /* 10 total plain   */
+  +   '<xf numFmtId="164" fontId="1" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyNumberFormat="1"/>' /* 11 total int   */
+  +   '<xf numFmtId="165" fontId="1" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyNumberFormat="1"/>' /* 12 total hours */
+  +   '<xf numFmtId="166" fontId="1" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyNumberFormat="1"/>' /* 13 total money */
+  +   '<xf numFmtId="0"   fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'                        /* 14 info label      */
+  +   '<xf numFmtId="0"   fontId="0" fillId="0" borderId="0" xfId="0"/>'                                      /* 15 info value      */
+  +   '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'                /* 16 info value int  */
+  +   '<xf numFmtId="0"   fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>' /* 17 note wrap */
+  +   '<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'                /* 18 plain hours     */
+  +   '<xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'                /* 19 plain money     */
+  + '</cellXfs>'
+  + '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+  + '</styleSheet>';
+}
+
+/* ---------- ZIP (stored, no compression) ---------- */
+var CRC_TABLE = (function(){
+  var t = new Int32Array(256);
+  for (var n=0;n<256;n++){ var c=n; for (var k=0;k<8;k++) c = (c&1) ? (0xEDB88320 ^ (c>>>1)) : (c>>>1); t[n]=c; }
+  return t;
+})();
+function crc32(bytes){
+  var c = -1;
+  for (var i=0;i<bytes.length;i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ -1) >>> 0;
+}
+function utf8(s){
+  if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(s);
+  var u = unescape(encodeURIComponent(s)), a = new Uint8Array(u.length);
+  for (var i=0;i<u.length;i++) a[i] = u.charCodeAt(i);
+  return a;
+}
+function zip(files){
+  var parts = [], central = [], offset = 0;
+  function u16(n){ return [n & 255, (n>>>8) & 255]; }
+  function u32(n){ return [n & 255, (n>>>8)&255, (n>>>16)&255, (n>>>24)&255]; }
+
+  files.forEach(function(f){
+    var nameB = utf8(f.name), dataB = utf8(f.data), crc = crc32(dataB);
+    var local = [].concat([0x50,0x4B,0x03,0x04], u16(20), u16(0), u16(0), u16(0), u16(0),
+                          u32(crc), u32(dataB.length), u32(dataB.length),
+                          u16(nameB.length), u16(0));
+    parts.push(new Uint8Array(local), nameB, dataB);
+    central.push({ name:nameB, crc:crc, size:dataB.length, offset:offset });
+    offset += local.length + nameB.length + dataB.length;
+  });
+
+  var cdir = [], cdirLen = 0;
+  central.forEach(function(c){
+    var h = [].concat([0x50,0x4B,0x01,0x02], u16(20), u16(20), u16(0), u16(0), u16(0), u16(0),
+                      u32(c.crc), u32(c.size), u32(c.size),
+                      u16(c.name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(c.offset));
+    cdir.push(new Uint8Array(h), c.name);
+    cdirLen += h.length + c.name.length;
+  });
+  var end = new Uint8Array([].concat([0x50,0x4B,0x05,0x06], u16(0), u16(0),
+                  u16(central.length), u16(central.length), u32(cdirLen), u32(offset), u16(0)));
+
+  var all = parts.concat(cdir, [end]);
+  var total = all.reduce(function(a,b){ return a + b.length; }, 0);
+  var out = new Uint8Array(total), p = 0;
+  all.forEach(function(b){ out.set(b, p); p += b.length; });
+  return out;
+}
+
+/* ---------- Workbook assembly ---------- */
+function buildWorkbook(model){
+  var meta = model.meta, det = model.detail, emps = model.employees;
+  var HR = 4;                        // header row on both data sheets
+  var d0 = HR + 1, d1 = HR + det.length;          // detail data rows
+  var dTotal = d1 + 1;
+  var e0 = HR + 1, e1 = HR + emps.length;          // summary data rows
+  var eTotal = e1 + 1;
+  if (!det.length) { d1 = HR; dTotal = HR + 1; }
+  if (!emps.length){ e1 = HR; eTotal = HR + 1; }
+
+  var R = {
+    pk:   "'Job Detail'!$F$"+d0+":$F$"+d1,
+    code: "'Job Detail'!$G$"+d0+":$G$"+d1,
+    hrs:  "'Job Detail'!$M$"+d0+":$M$"+d1,
+    amt:  "'Job Detail'!$O$"+d0+":$O$"+d1
+  };
+
+  function T(v){ return {v:v, t:'s', s:1}; }
+  function N(v){ return {v:v, t:'s', s:2}; }
+  function blank(){ return null; }
+
+  /* ---- Sheet 1: Pay Period Info ---- */
+  var info = [];
+  info[0] = {cells:[T('Pay Period Export — ' + (meta.siteName || 'Untitled Site'))]};
+  info[1] = {cells:[N('Converted from the source PayPeriod JSON export. Raw source values are preserved exactly; derived columns are shaded and computed by formula.')]};
+  var ir = 3;
+  [
+    ['Site Name', meta.siteName, 's'],
+    ['Partner Site ID', meta.partnerSiteID, 's'],
+    ['Pay Period ID', meta.payPeriodID, 's'],
+    ['Payroll Start Date', meta.startDate, 's'],
+    ['Payroll End Date', meta.endDate, 's'],
+    ['Created At', meta.createdAt, 's'],
+    ['Last Modified At', meta.lastModifiedAt, 's'],
+    ['Employees in File', emps.length, 'n'],
+    ['Job Detail Lines in File', det.length, 'n']
+  ].forEach(function(row){
+    info[ir++] = {cells:[{v:row[0], t:'s', s:14}, {v:row[1], t:row[2], s:(row[2]==='n'?16:15)}]};
+  });
+  if (model.filterNote){
+    info[ir++] = {h:30, cells:[{v:'Filter applied', t:'s', s:14}, {v:model.filterNote, t:'s', s:17}]};
+  }
+  ir++;
+  info[ir++] = {cells:[T('Field notes & conversion assumptions')]};
+  FIELD_NOTES.forEach(function(nt){
+    info[ir++] = {h:30, cells:[{v:nt[0], t:'s', s:14}, {v:nt[1], t:'s', s:17}]};
+  });
+  if (model.warnings.length){
+    ir++;
+    info[ir++] = {cells:[T('Warnings raised during conversion')]};
+    model.warnings.forEach(function(w){
+      info[ir++] = {h:30, cells:[{v:'!', t:'s', s:14}, {v:w, t:'s', s:17}]};
+    });
+  }
+  var sheetInfo = { rows: info, cols: [34, 95] };
+
+  /* ---- Sheet 2: Job Detail ---- */
+  var rowsD = [];
+  rowsD[0] = {cells:[T('Job Detail — one row per source jobDetailArray record')]};
+  rowsD[1] = {cells:[N('White columns are copied verbatim from the source file. Shaded columns are derived by formula (see Pay Period Info sheet).')]};
+  rowsD[HR-1] = {h:30, cells: DETAIL_COLS.map(function(c){ return {v:c.h, t:'s', s:3}; })};
+  det.forEach(function(row, i){
+    var r = d0 + i;
+    rowsD[r-1] = {cells: DETAIL_COLS.map(function(c){
+      var cell = {v: row[c.key], t: c.t, s: c.s};
+      if (c.f) cell.f = c.f(r);
+      return cell;
+    })};
+  });
+  if (det.length){
+    var tc = DETAIL_COLS.map(function(){ return {v:'', s:10}; });
+    tc[0]  = {v:'TOTAL', t:'s', s:10};
+    tc[9]  = {v: det.reduce(function(a,b){return a+b.minutes;},0), t:'n', s:11, f:'SUM(J'+d0+':J'+d1+')'};
+    tc[12] = {v: det.reduce(function(a,b){return a+b.hours;},0),   t:'n', s:12, f:'SUM(M'+d0+':M'+d1+')'};
+    tc[14] = {v: det.reduce(function(a,b){return a+b.amount;},0),  t:'n', s:13, f:'SUM(O'+d0+':O'+d1+')'};
+    rowsD[dTotal-1] = {cells: tc};
+  }
+  var sheetDet = {
+    rows: rowsD,
+    cols: DETAIL_COLS.map(function(c){ return c.w; }),
+    freeze: HR,
+    filter: det.length ? 'A'+HR+':'+colLetter(DETAIL_COLS.length)+d1 : null
+  };
+
+  /* ---- Sheet 3: Employee Summary ---- */
+  var rowsS = [];
+  rowsS[0] = {cells:[T('Employee Summary — one row per employee')]};
+  rowsS[1] = {cells:[N("Hours and wages are pulled from the 'Job Detail' sheet with SUMIFS on the Employee Primary Key, so they always reconcile to the detail rows.")]};
+  rowsS[HR-1] = {h:30, cells: SUMMARY_COLS.map(function(c){ return {v:c.h, t:'s', s:3}; })};
+  emps.forEach(function(e, i){
+    var r = e0 + i;
+    var src = {
+      n: i+1, firstName:e.firstName, lastName:e.lastName, empID:e.empID, payrollID:e.payrollID,
+      empPK:e.empPK, ccTipsRaw:e.ccTipsRaw, cashTipsRaw:e.cashTipsRaw,
+      hNP:e.hours.NP, hOP:e.hours.OP, hDP:e.hours.DP, hEP:e.hours.EP,
+      totalHours:e.totalHours, wages:e.wages, ccTips:e.ccTips, cashTips:e.cashTips, totalPay:e.totalPay
+    };
+    rowsS[r-1] = {cells: SUMMARY_COLS.map(function(c){
+      var cell = {v: src[c.key], t: c.t, s: c.s};
+      if (c.f) cell.f = c.f(r, R);
+      return cell;
+    })};
+  });
+  if (emps.length){
+    function sum(fn){ return emps.reduce(function(a,b){ return a + fn(b); }, 0); }
+    var sc = SUMMARY_COLS.map(function(){ return {v:'', s:10}; });
+    sc[0]  = {v:'TOTAL', t:'s', s:10};
+    [[6,'ccTipsRaw',11],[7,'cashTipsRaw',11]].forEach(function(x){
+      sc[x[0]] = {v:sum(function(e){return e[x[1]];}), t:'n', s:x[2], f:'SUM('+colLetter(x[0]+1)+e0+':'+colLetter(x[0]+1)+e1+')'};
+    });
+    var hCols = [[8,function(e){return e.hours.NP;}],[9,function(e){return e.hours.OP;}],
+                 [10,function(e){return e.hours.DP;}],[11,function(e){return e.hours.EP;}],
+                 [12,function(e){return e.totalHours;}]];
+    hCols.forEach(function(x){
+      var L = colLetter(x[0]+1);
+      sc[x[0]] = {v:sum(x[1]), t:'n', s:12, f:'SUM('+L+e0+':'+L+e1+')'};
+    });
+    [[13,function(e){return e.wages;}],[14,function(e){return e.ccTips;}],
+     [15,function(e){return e.cashTips;}],[16,function(e){return e.totalPay;}]].forEach(function(x){
+      var L = colLetter(x[0]+1);
+      sc[x[0]] = {v:sum(x[1]), t:'n', s:13, f:'SUM('+L+e0+':'+L+e1+')'};
+    });
+    rowsS[eTotal-1] = {cells: sc};
+
+    var rr = eTotal + 2;
+    rowsS[rr-1]   = {cells:[{v:'Reconciliation check (Employee Summary vs Job Detail):', t:'s', s:14}]};
+    rowsS[rr]     = {cells:[{v:'Total hours difference', t:'s', s:15}, null,
+                            {v:0, t:'n', s:18, f:'M'+eTotal+"-'Job Detail'!M"+dTotal}]};
+    rowsS[rr+1]   = {cells:[{v:'Total wages difference', t:'s', s:15}, null,
+                            {v:0, t:'n', s:19, f:'N'+eTotal+"-'Job Detail'!O"+dTotal}]};
+    rowsS[rr+2]   = {cells:[N('Both must read 0.00 — they prove no detail row was dropped or double-counted.')]};
+  }
+  var sheetSum = {
+    rows: rowsS,
+    cols: SUMMARY_COLS.map(function(c){ return c.w; }),
+    freeze: HR,
+    filter: emps.length ? 'A'+HR+':'+colLetter(SUMMARY_COLS.length)+e1 : null
+  };
+
+  /* ---- package ---- */
+  var files = [
+    {name:'[Content_Types].xml', data:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      +'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+      +'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+      +'<Default Extension="xml" ContentType="application/xml"/>'
+      +'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+      +'<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+      +'<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+      +'<Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+      +'<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+      +'</Types>'},
+    {name:'_rels/.rels', data:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      +'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      +'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+      +'</Relationships>'},
+    {name:'xl/workbook.xml', data:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      +'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+      +'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+      +'<sheets>'
+      +'<sheet name="Pay Period Info" sheetId="1" r:id="rId1"/>'
+      +'<sheet name="Job Detail" sheetId="2" r:id="rId2"/>'
+      +'<sheet name="Employee Summary" sheetId="3" r:id="rId3"/>'
+      +'</sheets><calcPr calcId="0" fullCalcOnLoad="1"/></workbook>'},
+    {name:'xl/_rels/workbook.xml.rels', data:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      +'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      +'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+      +'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>'
+      +'<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/>'
+      +'<Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+      +'</Relationships>'},
+    {name:'xl/styles.xml', data: stylesXml()},
+    {name:'xl/worksheets/sheet1.xml', data: sheetXml(sheetInfo)},
+    {name:'xl/worksheets/sheet2.xml', data: sheetXml(sheetDet)},
+    {name:'xl/worksheets/sheet3.xml', data: sheetXml(sheetSum)}
+  ];
+  return zip(files);
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { parsePayPeriod: parsePayPeriod, buildWorkbook: buildWorkbook, deriveFilteredModel: deriveFilteredModel, DETAIL_COLS: DETAIL_COLS, SUMMARY_COLS: SUMMARY_COLS };
+}
+
+/*==CORE_END==*/
+
+/* ============================================================
+   UI — Excel-style grid: sort, per-column filters, search,
+   live totals, column resize, filtered export.
+   ============================================================ */
+(function(){
+  var drop      = document.getElementById('drop');
+  var input     = document.getElementById('fileInput');
+  var messages  = document.getElementById('messages');
+  var result    = document.getElementById('result');
+  var model = null, sourceName = '', views = {}, activeTab = 'sum';
+
+  /* ---------- formatting ---------- */
+  function money(n){ return '$' + Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function hrs(n){   return Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function intf(n){  return Number(n).toLocaleString(); }
+  function fmtVal(c, v){
+    if (v === '' || v === null || v === undefined) return '';
+    if (c.fmt === 'money') return money(v);
+    if (c.fmt === 'hrs')   return hrs(v);
+    if (c.fmt === 'int')   return intf(v);
+    if (c.fmt === 'raw')   return Number(v).toLocaleString(undefined,{maximumFractionDigits:2});
+    return String(v);
+  }
+  function esch(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function banner(type, title, lines){
+    var el = document.createElement('div');
+    el.className = 'msg ' + type;
+    el.innerHTML = '<b>' + esch(title) + '</b>' +
+      (lines && lines.length ? '<ul>' + lines.map(function(l){ return '<li>' + esch(l) + '</li>'; }).join('') + '</ul>' : '');
+    messages.appendChild(el);
+  }
+
+  /* ============================================================
+     TableView
+     ============================================================ */
+  function TableView(el, cols, rows, statusEl){
+    this.el = el; this.cols = cols; this.rows = rows; this.statusEl = statusEl;
+    this.search = '';
+    this.filters = {};          // key -> { set: Set(displayStrings) }
+    this.sort = null;           // { key, dir }
+    this.widths = {};
+    var self = this;
+    cols.forEach(function(c){ self.widths[c.key] = Math.max(76, Math.round(c.w * 8.4)); });
+    this.build();
+  }
+
+  TableView.prototype.cellText = function(c, row){
+    var v = fmtVal(c, row[c.key]);
+    return v === '' ? '(blank)' : v;
+  };
+
+  /* rows passing every filter except the named column (Excel behaviour:
+     a column's own dropdown lists the values still available from the others) */
+  TableView.prototype.pass = function(row, skipKey){
+    var self = this;
+    for (var k in this.filters){
+      if (k === skipKey) continue;
+      var f = this.filters[k];
+      if (!f) continue;
+      var col = this.colByKey(k);
+      if (!f.set.has(this.cellText(col, row))) return false;
+    }
+    if (this.search){
+      var terms = this.search.toLowerCase().split(/\s+/).filter(Boolean);
+      var hay = this.cols.map(function(c){ return fmtVal(c, row[c.key]); }).join(' \u0001 ').toLowerCase();
+      for (var i = 0; i < terms.length; i++) if (hay.indexOf(terms[i]) === -1) return false;
+    }
+    return true;
+  };
+
+  TableView.prototype.colByKey = function(k){
+    for (var i = 0; i < this.cols.length; i++) if (this.cols[i].key === k) return this.cols[i];
+    return null;
+  };
+
+  TableView.prototype.visible = function(){
+    var self = this;
+    var out = this.rows.filter(function(r){ return self.pass(r); });
+    if (this.sort){
+      var c = this.colByKey(this.sort.key), dir = this.sort.dir === 'asc' ? 1 : -1;
+      out = out.slice().sort(function(a, b){
+        var x = a[c.key], y = b[c.key];
+        if (c.t === 'n'){ x = Number(x) || 0; y = Number(y) || 0; return (x - y) * dir; }
+        return String(x).localeCompare(String(y), undefined, {numeric:true, sensitivity:'base'}) * dir;
+      });
+    }
+    return out;
+  };
+
+  TableView.prototype.activeFilterCount = function(){
+    var n = 0; for (var k in this.filters) if (this.filters[k]) n++;
+    return n;
+  };
+
+  TableView.prototype.build = function(){
+    var self = this;
+    this.el.innerHTML = '<div class="gridscroll"><table class="grid"><colgroup></colgroup><thead></thead><tbody></tbody><tfoot></tfoot></table></div>';
+    this.table = this.el.querySelector('table');
+    this.render();
+
+    /* header interactions */
+    this.table.querySelector('thead').addEventListener('click', function(e){
+      var fbtn = e.target.closest('.fbtn');
+      if (fbtn){ e.stopPropagation(); openFilter(self, fbtn.dataset.key, fbtn); return; }
+      var th = e.target.closest('th');
+      if (!th || e.target.classList.contains('rsz')) return;
+      self.toggleSort(th.dataset.key);
+    });
+
+    /* column resize */
+    this.table.querySelector('thead').addEventListener('mousedown', function(e){
+      if (!e.target.classList.contains('rsz')) return;
+      e.preventDefault(); e.stopPropagation();
+      var key = e.target.parentNode.dataset.key, startX = e.clientX, startW = self.widths[key];
+      function move(ev){ self.widths[key] = Math.max(50, startW + ev.clientX - startX); self.applyWidths(); }
+      function up(){ document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); }
+      document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+    });
+  };
+
+  TableView.prototype.toggleSort = function(key){
+    if (!this.sort || this.sort.key !== key) this.sort = { key: key, dir: 'asc' };
+    else if (this.sort.dir === 'asc') this.sort = { key: key, dir: 'desc' };
+    else this.sort = null;
+    this.render();
+  };
+
+  TableView.prototype.applyWidths = function(){
+    var self = this, cg = this.table.querySelector('colgroup');
+    cg.innerHTML = this.cols.map(function(c){ return '<col style="width:' + self.widths[c.key] + 'px">'; }).join('');
+  };
+
+  TableView.prototype.render = function(){
+    var self = this, vis = this.visible();
+
+    this.applyWidths();
+
+    this.table.querySelector('thead').innerHTML = '<tr>' + this.cols.map(function(c){
+      var arrow = self.sort && self.sort.key === c.key ? (self.sort.dir === 'asc' ? ' \u25B2' : ' \u25BC') : '';
+      var on = self.filters[c.key] ? ' on' : '';
+      return '<th data-key="' + c.key + '" class="' + (c.d ? 'd' : '') + '" title="' + esch(c.h) + '">'
+           + '<span class="hlab">' + esch(c.h) + '<span class="sortarrow">' + arrow + '</span></span>'
+           + '<button class="fbtn' + on + '" data-key="' + c.key + '" title="Filter this column">\u25BC</button>'
+           + '<span class="rsz"></span></th>';
+    }).join('') + '</tr>';
+
+    var body = '';
+    if (!vis.length){
+      body = '<tr><td class="empty" colspan="' + this.cols.length + '">No rows match the current search and filters.</td></tr>';
+    } else {
+      for (var i = 0; i < vis.length; i++){
+        var r = vis[i], tds = '';
+        for (var j = 0; j < this.cols.length; j++){
+          var c = this.cols[j], txt = fmtVal(c, r[c.key]);
+          tds += '<td class="' + (c.d ? 'd ' : '') + (c.t === 'n' ? 'num' : '') + '" title="' + esch(txt) + '">' + esch(txt) + '</td>';
+        }
+        body += '<tr>' + tds + '</tr>';
+      }
+    }
+    this.table.querySelector('tbody').innerHTML = body;
+
+    var sums = {};
+    this.cols.forEach(function(c){
+      if (c.sum) sums[c.key] = vis.reduce(function(a, r){ return a + (Number(r[c.key]) || 0); }, 0);
+    });
+    this.table.querySelector('tfoot').innerHTML = '<tr>' + this.cols.map(function(c, i){
+      if (i === 0) return '<td>TOTAL</td>';
+      return '<td class="' + (c.t === 'n' ? 'num' : '') + '">' + (c.sum ? esch(fmtVal(c, sums[c.key])) : '') + '</td>';
+    }).join('') + '</tr>';
+
+    if (this.statusEl){
+      var nf = this.activeFilterCount();
+      this.statusEl.innerHTML =
+        '<b>' + vis.length.toLocaleString() + '</b> of ' + this.rows.length.toLocaleString() + ' rows'
+        + (nf ? ' \u00B7 <b>' + nf + '</b> column filter' + (nf > 1 ? 's' : '') + ' active' : '')
+        + (this.search ? ' \u00B7 search \u201C' + esch(this.search) + '\u201D' : '')
+        + (this.sort ? ' \u00B7 sorted by ' + esch(this.colByKey(this.sort.key).h) + ' ' + this.sort.dir : '');
+    }
+    if (this.onChange) this.onChange();
+  };
+
+  TableView.prototype.clearAll = function(){
+    this.filters = {}; this.search = ''; this.sort = null; this.render();
+  };
+
+  /* ============================================================
+     Filter dropdown
+     ============================================================ */
+  var pop = null;
+  function closeFilter(){ if (pop){ pop.remove(); pop = null; } }
+  document.addEventListener('mousedown', function(e){ if (pop && !pop.contains(e.target)) closeFilter(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeFilter(); });
+
+  function openFilter(view, key, btn){
+    closeFilter();
+    var col = view.colByKey(key);
+
+    /* distinct values available given the OTHER columns' filters */
+    var counts = {}, order = [];
+    view.rows.forEach(function(r){
+      if (!view.pass(r, key)) return;
+      var t = view.cellText(col, r);
+      if (counts[t] === undefined){ counts[t] = 0; order.push(t); }
+      counts[t]++;
+    });
+    order.sort(function(a, b){
+      if (col.t === 'n'){
+        var x = parseFloat(String(a).replace(/[^0-9.\-]/g, '')), y = parseFloat(String(b).replace(/[^0-9.\-]/g, ''));
+        if (isFinite(x) && isFinite(y)) return x - y;
+      }
+      return String(a).localeCompare(String(b), undefined, {numeric:true, sensitivity:'base'});
+    });
+
+    var chosen = view.filters[key] ? new Set(view.filters[key].set) : new Set(order);
+
+    pop = document.createElement('div');
+    pop.className = 'fpop';
+    pop.innerHTML =
+      '<div class="fsort">'
+      + '<button data-sort="asc">Sort A \u2192 Z</button><button data-sort="desc">Sort Z \u2192 A</button></div>'
+      + '<input class="fsearch" type="text" placeholder="Search values\u2026">'
+      + '<label class="fall"><input type="checkbox" class="selall"> <b>(Select all)</b></label>'
+      + '<div class="flist"></div>'
+      + '<div class="fact"><button class="fclear">Clear filter</button><span class="sp"></span>'
+      + '<button class="fcancel">Cancel</button><button class="fok">Apply</button></div>';
+    document.body.appendChild(pop);
+
+    var rect = btn.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+    pop.style.top  = Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - ph - 10)) + 'px';
+    pop.style.left = Math.max(8, Math.min(rect.right - pw, window.innerWidth - pw - 10)) + 'px';
+
+    var listEl = pop.querySelector('.flist'), selAll = pop.querySelector('.selall'), term = '';
+
+    function paint(){
+      var shown = order.filter(function(v){ return !term || v.toLowerCase().indexOf(term) !== -1; });
+      listEl.innerHTML = shown.length
+        ? shown.map(function(v){
+            return '<label><input type="checkbox" value="' + esch(v) + '"' + (chosen.has(v) ? ' checked' : '') + '> '
+                 + '<span>' + esch(v) + '</span><i>' + counts[v] + '</i></label>';
+          }).join('')
+        : '<div class="fnone">No matching values</div>';
+      var allOn = shown.length && shown.every(function(v){ return chosen.has(v); });
+      selAll.checked = !!allOn;
+      selAll.indeterminate = !allOn && shown.some(function(v){ return chosen.has(v); });
+    }
+    paint();
+
+    listEl.addEventListener('change', function(e){
+      if (e.target.type !== 'checkbox') return;
+      if (e.target.checked) chosen.add(e.target.value); else chosen.delete(e.target.value);
+      paint();
+    });
+    selAll.addEventListener('change', function(){
+      var shown = order.filter(function(v){ return !term || v.toLowerCase().indexOf(term) !== -1; });
+      shown.forEach(function(v){ if (selAll.checked) chosen.add(v); else chosen.delete(v); });
+      paint();
+    });
+    pop.querySelector('.fsearch').addEventListener('input', function(e){ term = e.target.value.toLowerCase(); paint(); });
+    pop.querySelectorAll('[data-sort]').forEach(function(b){
+      b.addEventListener('click', function(){ view.sort = { key: key, dir: b.dataset.sort }; view.render(); closeFilter(); });
+    });
+    pop.querySelector('.fclear').addEventListener('click', function(){ delete view.filters[key]; view.render(); closeFilter(); });
+    pop.querySelector('.fcancel').addEventListener('click', closeFilter);
+    pop.querySelector('.fok').addEventListener('click', function(){
+      if (chosen.size === order.length) delete view.filters[key];
+      else view.filters[key] = { set: new Set(chosen) };
+      view.render(); closeFilter();
+    });
+  }
+
+  /* ============================================================
+     Load + render
+     ============================================================ */
+  function summaryRows(m){
+    return m.employees.map(function(e, i){
+      return { n:i+1, firstName:e.firstName, lastName:e.lastName, empID:e.empID, payrollID:e.payrollID,
+               empPK:e.empPK, ccTipsRaw:e.ccTipsRaw, cashTipsRaw:e.cashTipsRaw,
+               hNP:e.hours.NP, hOP:e.hours.OP, hDP:e.hours.DP, hEP:e.hours.EP,
+               totalHours:e.totalHours, wages:e.wages, ccTips:e.ccTips, cashTips:e.cashTips, totalPay:e.totalPay };
+    });
+  }
+
+  function render(){
+    var m = model;
+    document.getElementById('fileName').textContent = sourceName;
+    document.getElementById('fileStats').textContent =
+      m.employees.length + ' employees \u00B7 ' + m.detail.length + ' job detail lines \u00B7 pay period '
+      + (m.meta.payPeriodID || 'n/a') + ' (' + (m.meta.startDate || '?') + ' \u2013 ' + (m.meta.endDate || '?') + ')';
+
+    document.getElementById('infoGrid').innerHTML = [
+      ['Site Name', m.meta.siteName], ['Partner Site ID', m.meta.partnerSiteID],
+      ['Pay Period ID', m.meta.payPeriodID], ['Payroll Start Date', m.meta.startDate],
+      ['Payroll End Date', m.meta.endDate], ['Created At', m.meta.createdAt],
+      ['Last Modified At', m.meta.lastModifiedAt],
+      ['Employees / Detail Lines', m.employees.length + ' / ' + m.detail.length]
+    ].map(function(p){ return '<div><span>' + p[0] + '</span><b>' + esch(p[1] || '\u2014') + '</b></div>'; }).join('');
+
+    views.sum = new TableView(document.getElementById('pane-sum'), SUMMARY_COLS, summaryRows(m), document.getElementById('status'));
+    views.det = new TableView(document.getElementById('pane-det'), DETAIL_COLS, m.detail, document.getElementById('status'));
+    views.det.onChange = updateExportScope;
+
+    document.getElementById('notesList').innerHTML = FIELD_NOTES.map(function(n){
+      return '<dt>' + esch(n[0]) + '</dt><dd>' + esch(n[1]) + '</dd>';
+    }).join('');
+
+    setTab('sum');
+    result.classList.remove('hidden');
+    drop.classList.add('hidden');
+    updateExportScope();
+  }
+
+  function setTab(t){
+    activeTab = t;
+    document.querySelectorAll('.tabs button').forEach(function(b){ b.classList.toggle('active', b.dataset.tab === t); });
+    ['sum','det','not'].forEach(function(k){ document.getElementById('pane-' + k).classList.toggle('hidden', k !== t); });
+    var isGrid = (t !== 'not');
+    document.getElementById('toolbar').classList.toggle('hidden', !isGrid);
+    if (isGrid && views[t]){
+      document.getElementById('search').value = views[t].search;
+      views[t].statusEl = document.getElementById('status');
+      views[t].render();
+    }
+  }
+
+  function updateExportScope(){
+    if (!views.det) return;
+    var shown = views.det.visible().length, all = views.det.rows.length;
+    var lbl = document.getElementById('scopeLabel');
+    document.getElementById('scopeWrap').classList.toggle('dim', shown === all);
+    lbl.innerHTML = 'Export only the ' + shown.toLocaleString() + ' job detail row'
+      + (shown === 1 ? '' : 's') + ' currently shown (of ' + all.toLocaleString() + ')';
+    if (shown === all) document.getElementById('scope').checked = false;
+  }
+
+  function handle(file){
+    messages.innerHTML = '';
+    result.classList.add('hidden');
+    sourceName = file.name;
+    var reader = new FileReader();
+    reader.onerror = function(){ banner('err', 'Could not read that file.', []); };
+    reader.onload = function(){
+      try { model = parsePayPeriod(reader.result); }
+      catch (err){ banner('err', 'Conversion failed \u2014 nothing was changed.', [err.message]); return; }
+      var minutes = model.detail.reduce(function(a, b){ return a + b.minutes; }, 0);
+      banner('ok', 'File parsed successfully.', [
+        model.employees.length + ' employees and ' + model.detail.length + ' job detail lines read.',
+        'Source total of ' + minutes.toLocaleString() + ' minutes carried through with every row intact.'
+      ]);
+      if (model.warnings.length)
+        banner('warn', 'Review these ' + model.warnings.length + ' warning(s) before using the output:', model.warnings);
+      render();
+    };
+    reader.readAsText(file);
+  }
+
+  /* ---------- wiring ---------- */
+  drop.addEventListener('click', function(){ input.click(); });
+  input.addEventListener('change', function(){ if (input.files[0]) handle(input.files[0]); });
+  ['dragenter','dragover'].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add('over'); }); });
+  ['dragleave','drop'].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove('over'); }); });
+  drop.addEventListener('drop', function(e){ if (e.dataTransfer.files && e.dataTransfer.files[0]) handle(e.dataTransfer.files[0]); });
+
+  document.querySelectorAll('.tabs button').forEach(function(b){
+    b.addEventListener('click', function(){ setTab(b.dataset.tab); });
+  });
+
+  document.getElementById('search').addEventListener('input', function(e){
+    var v = views[activeTab]; if (!v) return;
+    v.search = e.target.value; v.render();
+  });
+  document.getElementById('btnClear').addEventListener('click', function(){
+    var v = views[activeTab]; if (!v) return;
+    v.clearAll(); document.getElementById('search').value = '';
+  });
+
+  document.getElementById('btnReset').addEventListener('click', function(){
+    model = null; views = {}; input.value = ''; messages.innerHTML = '';
+    result.classList.add('hidden'); drop.classList.remove('hidden');
+  });
+
+  document.getElementById('btnExport').addEventListener('click', function(){
+    if (!model) return;
+    try {
+      var out = model, suffix = '';
+      if (document.getElementById('scope').checked && views.det){
+        var kept = views.det.visible();
+        if (!kept.length){ banner('err', 'Nothing to export.', ['The current filters leave zero job detail rows.']); return; }
+        var bits = [];
+        if (views.det.search) bits.push('search "' + views.det.search + '"');
+        Object.keys(views.det.filters).forEach(function(k){ bits.push('column filter on ' + views.det.colByKey(k).h); });
+        out = deriveFilteredModel(model, kept,
+          'This workbook contains only ' + kept.length + ' of the source file\u2019s ' + model.detail.length
+          + ' job detail rows, filtered in the converter by ' + (bits.join(', ') || 'the on-screen view')
+          + '. Employee totals were recomputed from the kept rows only; employees with no remaining rows were dropped. '
+          + 'Tips are employee-level in the source and are carried over in full. Line numbers are the original source line numbers.');
+        suffix = '_filtered';
+      }
+      var blob = new Blob([buildWorkbook(out)], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      var name = (sourceName.replace(/\.(txt|json)$/i, '') || 'PayPeriod') + suffix;
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = name + '.xlsx';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+    } catch (err){
+      banner('err', 'Export failed.', [err.message]);
+    }
+  });
+})();
+
+</script>
+</body>
+</html>
