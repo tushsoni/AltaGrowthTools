@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Meal Break Premium — Impacted Punches Query Builder</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --panel:#ffffff; --border:#d8dee6; --text:#1f2937; --muted:#6b7280;
+    --accent:#1d4ed8; --accent-dark:#1e3a8a; --good:#15803d; --bad:#b91c1c; --code-bg:#0f172a; --code-text:#e2e8f0;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:Segoe UI, Arial, sans-serif; background:var(--bg); color:var(--text);
+  }
+  header{
+    background:linear-gradient(135deg,var(--accent-dark),var(--accent)); color:#fff; padding:22px 28px;
+  }
+  header h1{margin:0 0 4px 0; font-size:22px;}
+  header p{margin:0; font-size:13px; opacity:.9;}
+  .wrap{max-width:1300px; margin:0 auto; padding:20px 24px 60px;}
+  .grid{display:grid; grid-template-columns: 1fr 1fr; gap:20px;}
+  @media (max-width:980px){.grid{grid-template-columns:1fr;}}
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px 20px; margin-bottom:20px;
+  }
+  .panel h2{margin:0 0 14px 0; font-size:15px; color:var(--accent-dark); border-bottom:1px solid var(--border); padding-bottom:8px;}
+  label.field{display:block; font-size:12px; color:var(--muted); margin-bottom:4px; font-weight:600;}
+  input[type=date], input[type=text], textarea{
+    width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; font-family:inherit;
+    background:#fbfcfe;
+  }
+  textarea{resize:vertical; min-height:56px;}
+  .row{display:flex; gap:16px; flex-wrap:wrap;}
+  .row > div{flex:1; min-width:160px;}
+  .rule-block{margin-bottom:14px;}
+  .rule-block h3{margin:0 0 6px 0; font-size:13px; color:var(--text);}
+  .rule-head{display:flex; align-items:center; justify-content:space-between;}
+  .rule-head button{
+    background:none; border:1px solid var(--border); border-radius:5px; font-size:11px; padding:2px 8px; cursor:pointer; color:var(--accent);
+  }
+  .case{display:flex; align-items:flex-start; gap:8px; padding:6px 0; border-bottom:1px dashed #eef1f4;}
+  .case:last-child{border-bottom:none;}
+  .case input{margin-top:3px;}
+  .case .label{font-size:12.5px; line-height:1.4;}
+  .case .label b{color:var(--text);}
+  .case .label span{color:var(--muted); display:block; font-size:11.5px;}
+  .toolbar{display:flex; gap:10px; flex-wrap:wrap; margin:6px 0 4px;}
+  .toolbar button{
+    background:#eef2ff; border:1px solid #c7d2fe; color:var(--accent-dark); border-radius:6px; padding:5px 10px; font-size:11.5px; cursor:pointer;
+  }
+  .toolbar button:hover{background:#e0e7ff;}
+  .fmt-btn.active{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .checkline{display:flex; align-items:center; gap:8px; font-size:13px; margin:10px 0;}
+  .checkline b{font-size:13px;}
+  .hint{font-size:11.5px; color:var(--muted); margin-top:4px;}
+  .actions{display:flex; gap:10px; margin:18px 0; flex-wrap:wrap;}
+  .actions button{
+    padding:10px 18px; border-radius:8px; border:none; font-size:13.5px; font-weight:600; cursor:pointer;
+  }
+  #generateBtn{background:var(--accent); color:#fff;}
+  #generateBtn:hover{background:var(--accent-dark);}
+  #copyBtn{background:#eef2ff; color:var(--accent-dark); border:1px solid #c7d2fe;}
+  #downloadBtn{background:#f0fdf4; color:var(--good); border:1px solid #bbf7d0;}
+  #status{font-size:12.5px; margin-left:6px; align-self:center; color:var(--good);}
+  pre#sqlOut{
+    background:var(--code-bg); color:var(--code-text); padding:16px; border-radius:8px; font-size:12px;
+    white-space:pre-wrap; word-break:break-word; max-height:560px; overflow:auto; line-height:1.5;
+  }
+  .badge{display:inline-block; background:#fee2e2; color:var(--bad); border-radius:4px; padding:1px 7px; font-size:10.5px; font-weight:700; margin-left:6px;}
+  .count{font-size:12px; color:var(--muted); margin-bottom:8px;}
+
+  #toast{
+    position:fixed; top:20px; right:20px; z-index:1000;
+    background:#15803d; color:#fff; padding:12px 18px; border-radius:8px; font-size:13.5px; font-weight:600;
+    box-shadow:0 8px 20px rgba(0,0,0,.18); display:flex; align-items:center; gap:10px;
+    opacity:0; transform:translateY(-8px); pointer-events:none; transition:opacity .25s ease, transform .25s ease;
+  }
+  #toast.show{opacity:1; transform:translateY(0);}
+  #toast.error{background:#b91c1c;}
+  #toast .icon{font-size:16px;}
+</style>
+</head>
+<body>
+
+<div id="toast"><span class="icon">✔</span><span id="toastMsg"></span></div>
+
+<header>
+  <h1>Meal Break Premium — Impacted Punches Query Builder</h1>
+  <p>Select the date range, stores, and violation cases below to generate the query for punches where a meal break premium <b>should have been generated but was not</b>.</p>
+</header>
+
+<div class="wrap">
+
+  <div class="grid">
+
+    <!-- LEFT COLUMN: Date / Store / Options -->
+    <div>
+      <div class="panel">
+        <h2>1. Date Range</h2>
+        <div class="row">
+          <div>
+            <label class="field">Start Date (Busi Date)</label>
+            <input type="date" id="startDate" value="2026-08-10">
+          </div>
+          <div>
+            <label class="field">End Date (Busi Date)</label>
+            <input type="date" id="endDate" value="2026-08-16">
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>2. Stores</h2>
+        <div class="checkline">
+          <input type="checkbox" id="allStores">
+          <b>Include all stores (ignore store filter)</b>
+        </div>
+        <label class="field">Store ID(s) — comma or newline separated (used only when "all stores" is unchecked)</label>
+        <textarea id="storeList" placeholder="e.g. 001, 004, 007" style="min-height:110px;">001, 004, 007, 008, 009, 012, 015, 016, 017, 018, 019, 020, 023, 025, 026, 029, 032, 034, 037, 041, 042, 045, 047, 056, 058, 059, 076, 077, 085, 098, 102, 106, 110, 124, 127, 134, 149, 167, 168, 170, 171, 174, 181, 183, 189, 190, 202, 203, 215, 236, 237, 242, 249, 261, 262, 275, 279, 309, 331, 906, 907, 910, 911, 912</textarea>
+        <div class="hint">Each value will be wrapped in quotes and placed in <code>s.id IN (...)</code>. Pre-filled with the 64 impacted stores.</div>
+      </div>
+
+      <div class="panel">
+        <h2>3. Impacted-Records Filter</h2>
+        <div class="checkline">
+          <input type="checkbox" id="impactedOnly" checked>
+          <b>Only include punches where premium SHOULD be generated but is NOT</b>
+        </div>
+        <div class="hint">
+          Adds <code>COALESCE(f.meal_viol_count,0) = 0</code> so only the affected/bugged punches are returned
+          (violation occurred, no meal premium pay was actually provided). Uncheck to see <i>all</i> violation
+          punches regardless of whether premium was paid, for comparison.
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN: Case selection -->
+    <div>
+      <div class="panel">
+        <h2>4. Violation Cases to Include</h2>
+        <div class="toolbar">
+          <button type="button" onclick="setAllCases(true)">Select All</button>
+          <button type="button" onclick="setAllCases(false)">Clear All</button>
+        </div>
+
+        <div class="rule-block">
+          <div class="rule-head">
+            <h3>Rule 1 — First Meal Break Waiver (Shift 5:00–6:00 hrs)</h3>
+            <button type="button" onclick="setRule('r1', true)">all</button>
+          </div>
+          <div class="case"><input type="checkbox" class="case-cb r1" value="Rule 1 - Case 3" checked>
+            <div class="label"><b>Case 3</b> — Meal taken after end of 5th hour, duration ≥ 30 min<span>Late meal break – Violation</span></div></div>
+          <div class="case"><input type="checkbox" class="case-cb r1" value="Rule 1 - Case 4" checked>
+            <div class="label"><b>Case 4</b> — Meal taken after end of 5th hour, duration &lt; 30 min<span>Late meal break + insufficient duration – Violation</span></div></div>
+          <div class="case"><input type="checkbox" class="case-cb r1" value="Rule 1 - Case 5" checked>
+            <div class="label"><b>Case 5</b> — Meal taken at/before end of 5th hour, duration &lt; 30 min<span>Meal break duration requirement not satisfied – Violation</span></div></div>
+        </div>
+
+        <div class="rule-block">
+          <div class="rule-head">
+            <h3>Rule 3 — First Meal Break Requirement (Shift &gt;6:00–&lt;10:00 hrs, mandatory)</h3>
+            <button type="button" onclick="setRule('r3', true)">all</button>
+          </div>
+          <div class="case"><input type="checkbox" class="case-cb r3" value="Rule 3 - Case 1" checked>
+            <div class="label"><b>Case 1</b> — No first meal break taken<span>First meal break missed – Violation</span></div></div>
+          <div class="case"><input type="checkbox" class="case-cb r3" value="Rule 3 - Case 3" checked>
+            <div class="label"><b>Case 3</b> — Meal taken after end of 5th hour, duration ≥ 30 min<span>Late meal break – Violation</span></div></div>
+          <div class="case"><input type="checkbox" class="case-cb r3" value="Rule 3 - Case 4" checked>
+            <div class="label"><b>Case 4</b> — Meal taken at/before end of 5th hour, duration &lt; 30 min<span>Meal break duration requirement not satisfied – Violation</span></div></div>
+          <div class="case"><input type="checkbox" class="case-cb r3" value="Rule 3 - Case 5" checked>
+            <div class="label"><b>Case 5</b> — Meal taken after end of 5th hour, duration &lt; 30 min<span>Late meal break + insufficient duration – Violation</span></div></div>
+        </div>
+
+        <div class="rule-block">
+          <div class="rule-head">
+            <h3>Rule 2 — Second Meal Break Waiver (Shift &gt;10:00–12:00 hrs)</h3>
+            <button type="button" onclick="setRule('r2', true)">all</button>
+          </div>
+          <div style="font-size:12px; color:var(--muted); margin:2px 0 6px;">Case A — first meal break was WAIVED</div>
+          <div class="case"><input type="checkbox" class="case-cb r2" value="Rule 2 - Case A1" checked>
+            <div class="label"><b>Case A1</b> — No second meal break taken<span>Second meal break missed – Violation</span></div></div>
+          <div class="case"><input type="checkbox" class="case-cb r2" value="Rule 2 - Case A3" checked>
+            <div class="label"><b>Case A3</b> — Second meal after end of 10th hour, duration ≥ 30 min<span>Late second meal break – Violation</span></div></div>
+          <div class="case"><input type="checkbox" class="case-cb r2" value="Rule 2 - Case A4" checked>
+            <div class="label"><b>Case A4</b> — Second meal at/before end of 10th hour, duration &lt; 30 min<span>Meal break duration requirement not satisfied – Violation</span></div></div>
+          <div class="case"><input type="checkbox" class="case-cb r2" value="Rule 2 - Case A5" checked>
+            <div class="label"><b>Case A5</b> — Second meal after end of 10th hour, duration &lt; 30 min<span>Late second meal + insufficient duration – Violation</span></div></div>
+
+          <div style="font-size:12px; color:var(--muted); margin:10px 0 6px;">Case B — first meal break was NOT waived. A missing second meal break is always waived here (never a violation on its own) — but the first meal's own lateness/duration is checked independently, regardless of the second meal's status:</div>
+          <div class="case"><input type="checkbox" class="case-cb r2" value="Rule 2 - Case B-FirstLate" checked>
+            <div class="label"><b>Case B-FirstLate</b> <span class="badge" style="margin-left:6px;">GAP FIX</span> — First meal itself late (after 5th hour), duration ≥ 30 min<span>Late first meal break – Violation (independent of second meal)</span></div></div>
+          <div class="case"><input type="checkbox" class="case-cb r2" value="Rule 2 - Case B-FirstShort" checked>
+            <div class="label"><b>Case B-FirstShort</b> <span class="badge" style="margin-left:6px;">GAP FIX</span> — First meal on time but duration &lt; 30 min<span>First meal duration requirement not satisfied – Violation (independent of second meal)</span></div></div>
+          <div class="case"><input type="checkbox" class="case-cb r2" value="Rule 2 - Case B-FirstLateShort" checked>
+            <div class="label"><b>Case B-FirstLateShort</b> <span class="badge" style="margin-left:6px;">GAP FIX</span> — First meal late AND duration &lt; 30 min<span>Late first meal + insufficient duration – Violation (independent of second meal)</span></div></div>
+          <div class="case"><input type="checkbox" class="case-cb r2" value="Rule 2 - Case B3" checked>
+            <div class="label"><b>Case B3</b> — Second meal after end of 10th hour, duration ≥ 30 min<span>Late second meal break – Violation</span></div></div>
+          <div class="case"><input type="checkbox" class="case-cb r2" value="Rule 2 - Case B4" checked>
+            <div class="label"><b>Case B4</b> — Second meal at/before end of 10th hour, duration &lt; 30 min<span>Meal break duration requirement not satisfied – Violation</span></div></div>
+          <div class="case"><input type="checkbox" class="case-cb r2" value="Rule 2 - Case B5" checked>
+            <div class="label"><b>Case B5</b> — Second meal after end of 10th hour, duration &lt; 30 min<span>Late second meal + insufficient duration – Violation</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="generateBtn" onclick="generateQuery()">Generate Query</button>
+    <button id="copyBtn" onclick="copyQuery()">Copy to Clipboard</button>
+    <button id="downloadBtn" onclick="downloadQuery()">Download .sql</button>
+    <span id="status"></span>
+  </div>
+
+  <div class="panel">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:6px;">
+      <h2 style="border:none; margin:0;">Generated Query <span class="badge" id="caseCountBadge">17/17 cases</span></h2>
+      <div class="toolbar" style="margin:0;">
+        <button type="button" id="fmtMultiBtn" class="fmt-btn active" onclick="setFormat('multi')">Formatted (multi-line)</button>
+        <button type="button" id="fmtSingleBtn" class="fmt-btn" onclick="setFormat('single')">Single Line</button>
+      </div>
+    </div>
+    <div class="count" id="filterSummary"></div>
+    <pre id="sqlOut">Click "Generate Query" to build the SQL for the selected filters.</pre>
+  </div>
+
+</div>
+
+<script>
+let lastFormattedSql = '';
+let lastSingleLineSql = '';
+let currentFormat = 'multi';
+
+function setAllCases(state){
+  document.querySelectorAll('.case-cb').forEach(cb => cb.checked = state);
+}
+function setRule(prefix, state){
+  document.querySelectorAll('.case-cb.' + prefix).forEach(cb => cb.checked = state);
+}
+
+function quoteList(raw){
+  return raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean).map(s => "'" + s.replace(/'/g, "''") + "'");
+}
+
+let toastTimer = null;
+function showToast(message, isError){
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = message;
+  t.querySelector('.icon').textContent = isError ? '⚠' : '✔';
+  t.classList.toggle('error', !!isError);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+function generateQuery(){
+  const start = document.getElementById('startDate').value;
+  const end = document.getElementById('endDate').value;
+  if(!start || !end){
+    showToast('Please select both a start date and an end date.', true);
+    return;
+  }
+  if(new Date(start) > new Date(end)){
+    showToast('Start date must be on or before the end date.', true);
+    return;
+  }
+
+  const allStores = document.getElementById('allStores').checked;
+  const storeRaw = document.getElementById('storeList').value;
+  const storeQuoted = quoteList(storeRaw);
+
+  const checkedCases = Array.from(document.querySelectorAll('.case-cb:checked')).map(cb => "'" + cb.value + "'");
+  const totalCases = document.querySelectorAll('.case-cb').length;
+  document.getElementById('caseCountBadge').textContent = checkedCases.length + '/' + totalCases + ' cases';
+
+  if(checkedCases.length === 0){
+    showToast('Please select at least one violation case.', true);
+    return;
+  }
+
+  const impactedOnly = document.getElementById('impactedOnly').checked;
+
+  const storeClause = allStores
+    ? ''
+    : (' AND s.id IN (' + (storeQuoted.length ? storeQuoted.join(', ') : "''") + ')');
+
+  const caseClause = 'f.rule_case IN (' + checkedCases.join(', ') + ')';
+  const impactedClause = impactedOnly ? '\n  AND COALESCE(f.meal_viol_count, 0) = 0' : '';
+
+  const summaryParts = [];
+  summaryParts.push('Date range: ' + start + ' to ' + end);
+  summaryParts.push(allStores ? 'Stores: ALL' : ('Stores: ' + (storeQuoted.length ? storeQuoted.join(', ') : '(none entered)')));
+  summaryParts.push('Cases: ' + checkedCases.length + ' of ' + totalCases + ' selected');
+  summaryParts.push(impactedOnly ? 'Scope: impacted punches only (premium not generated despite violation)' : 'Scope: all selected-case violations, regardless of premium paid');
+  document.getElementById('filterSummary').textContent = summaryParts.join('  |  ');
+
+  const sql = `SELECT
+    f.store_number AS "Store Number",
+    f.employee_id AS "Employee ID",
+    f.first_name AS "First Name",
+    f.last_name AS "Last Name",
+    f.job_code AS "Job Code",
+    f.busi_date AS "Busi Date",
+    TO_CHAR(f.clockin_min * INTERVAL '1 minute', 'HH12:MI AM') AS "Clock In",
+    TO_CHAR(f.clockout_min * INTERVAL '1 minute', 'HH12:MI AM') AS "Clock Out",
+    ROUND(f.shift_min / 60.0, 2) AS "Total Shift Hours",
+    TO_CHAR((f.shift_min - COALESCE(f.first_meal_duration, 0) - COALESCE(f.second_meal_duration, 0)) * INTERVAL '1 minute', 'HH24:MI') AS "Clock Hours",
+    f.rule_number AS "Rule Number",
+    f.rule_case AS "Case #",
+    f.system_result AS "Issue Found",
+    TO_CHAR(f.first_meal_start * INTERVAL '1 minute', 'HH12:MI AM') AS "1st Meal Start",
+    TO_CHAR(f.first_meal_end * INTERVAL '1 minute', 'HH12:MI AM') AS "1st Meal End",
+    ROUND(f.first_meal_duration, 0) AS "1st Meal Duration (min)",
+    TO_CHAR(f.second_meal_start * INTERVAL '1 minute', 'HH12:MI AM') AS "2nd Meal Start",
+    TO_CHAR(f.second_meal_end * INTERVAL '1 minute', 'HH12:MI AM') AS "2nd Meal End",
+    ROUND(f.second_meal_duration, 0) AS "2nd Meal Duration (min)",
+    CASE WHEN COALESCE(f.meal_viol_count, 0) > 0 THEN 'True' ELSE 'False' END AS "Meal Premium Pay Provided",
+    ROUND(COALESCE(f.meal_viol_pay, 0) / 100.0, 2) AS "Meal Premium Pay Amount",
+    f.noofbrkviolation AS "App Recorded Break Violation Count"
+FROM (
+    SELECT
+        e.store_number, e.employee_id, e.first_name, e.last_name, e.job_code, e.busi_date,
+        e.clockin_min, e.clockout_min, e.shift_min,
+        e.first_meal_start, e.first_meal_end, e.second_meal_start, e.second_meal_end,
+        e.meal_viol_count, e.meal_viol_pay, e.noofbrkviolation,
+        e.mins_to_first_meal, e.first_meal_duration, e.mins_to_second_meal, e.second_meal_duration,
+        e.rule_number,
+        CASE
+            WHEN e.rule_number = 'Rule 1' AND e.first_meal_start IS NULL THEN NULL
+            WHEN e.rule_number = 'Rule 1' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal <= 300 AND e.first_meal_duration >= 30 THEN NULL
+            WHEN e.rule_number = 'Rule 1' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal > 300 AND e.first_meal_duration >= 30 THEN 'Rule 1 - Case 3'
+            WHEN e.rule_number = 'Rule 1' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal > 300 AND e.first_meal_duration < 30 THEN 'Rule 1 - Case 4'
+            WHEN e.rule_number = 'Rule 1' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal <= 300 AND e.first_meal_duration < 30 THEN 'Rule 1 - Case 5'
+            WHEN e.rule_number = 'Rule 3' AND e.first_meal_start IS NULL THEN 'Rule 3 - Case 1'
+            WHEN e.rule_number = 'Rule 3' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal <= 300 AND e.first_meal_duration >= 30 THEN NULL
+            WHEN e.rule_number = 'Rule 3' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal > 300 AND e.first_meal_duration >= 30 THEN 'Rule 3 - Case 3'
+            WHEN e.rule_number = 'Rule 3' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal <= 300 AND e.first_meal_duration < 30 THEN 'Rule 3 - Case 4'
+            WHEN e.rule_number = 'Rule 3' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal > 300 AND e.first_meal_duration < 30 THEN 'Rule 3 - Case 5'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NULL AND e.second_meal_start IS NULL THEN 'Rule 2 - Case A1'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NULL AND e.second_meal_start IS NOT NULL AND e.mins_to_second_meal <= 600 AND e.second_meal_duration >= 30 THEN NULL
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NULL AND e.second_meal_start IS NOT NULL AND e.mins_to_second_meal > 600 AND e.second_meal_duration >= 30 THEN 'Rule 2 - Case A3'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NULL AND e.second_meal_start IS NOT NULL AND e.mins_to_second_meal <= 600 AND e.second_meal_duration < 30 THEN 'Rule 2 - Case A4'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NULL AND e.second_meal_start IS NOT NULL AND e.mins_to_second_meal > 600 AND e.second_meal_duration < 30 THEN 'Rule 2 - Case A5'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal > 300 AND e.first_meal_duration >= 30 THEN 'Rule 2 - Case B-FirstLate'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal <= 300 AND e.first_meal_duration < 30 THEN 'Rule 2 - Case B-FirstShort'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal > 300 AND e.first_meal_duration < 30 THEN 'Rule 2 - Case B-FirstLateShort'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NOT NULL AND e.second_meal_start IS NULL THEN NULL
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NOT NULL AND e.second_meal_start IS NOT NULL AND e.mins_to_second_meal <= 600 AND e.second_meal_duration >= 30 THEN NULL
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NOT NULL AND e.second_meal_start IS NOT NULL AND e.mins_to_second_meal > 600 AND e.second_meal_duration >= 30 THEN 'Rule 2 - Case B3'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NOT NULL AND e.second_meal_start IS NOT NULL AND e.mins_to_second_meal <= 600 AND e.second_meal_duration < 30 THEN 'Rule 2 - Case B4'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NOT NULL AND e.second_meal_start IS NOT NULL AND e.mins_to_second_meal > 600 AND e.second_meal_duration < 30 THEN 'Rule 2 - Case B5'
+            ELSE NULL
+        END AS rule_case,
+        CASE
+            WHEN e.rule_number = 'Rule 1' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal > 300 AND e.first_meal_duration >= 30 THEN 'Late meal break - Violation'
+            WHEN e.rule_number = 'Rule 1' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal > 300 AND e.first_meal_duration < 30 THEN 'Late meal break + insufficient duration - Violation'
+            WHEN e.rule_number = 'Rule 1' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal <= 300 AND e.first_meal_duration < 30 THEN 'Meal break duration requirement not satisfied - Violation'
+            WHEN e.rule_number = 'Rule 3' AND e.first_meal_start IS NULL THEN 'First meal break missed - Violation'
+            WHEN e.rule_number = 'Rule 3' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal > 300 AND e.first_meal_duration >= 30 THEN 'Late meal break - Violation'
+            WHEN e.rule_number = 'Rule 3' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal <= 300 AND e.first_meal_duration < 30 THEN 'Meal break duration requirement not satisfied - Violation'
+            WHEN e.rule_number = 'Rule 3' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal > 300 AND e.first_meal_duration < 30 THEN 'Late meal break + insufficient duration - Violation'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal > 300 AND e.first_meal_duration >= 30 THEN 'Late first meal break - Violation'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal <= 300 AND e.first_meal_duration < 30 THEN 'First meal break duration requirement not satisfied - Violation'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NOT NULL AND e.mins_to_first_meal > 300 AND e.first_meal_duration < 30 THEN 'Late first meal break + insufficient duration - Violation'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NULL AND e.second_meal_start IS NULL THEN 'Second meal break missed - Violation'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NULL AND e.second_meal_start IS NOT NULL AND e.mins_to_second_meal > 600 AND e.second_meal_duration >= 30 THEN 'Late second meal break - Violation'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NULL AND e.second_meal_start IS NOT NULL AND e.mins_to_second_meal <= 600 AND e.second_meal_duration < 30 THEN 'Meal break duration requirement not satisfied - Violation'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NULL AND e.second_meal_start IS NOT NULL AND e.mins_to_second_meal > 600 AND e.second_meal_duration < 30 THEN 'Late second meal + insufficient duration - Violation'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NOT NULL AND e.second_meal_start IS NOT NULL AND e.mins_to_second_meal > 600 AND e.second_meal_duration >= 30 THEN 'Late second meal break - Violation'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NOT NULL AND e.second_meal_start IS NOT NULL AND e.mins_to_second_meal <= 600 AND e.second_meal_duration < 30 THEN 'Meal break duration requirement not satisfied - Violation'
+            WHEN e.rule_number = 'Rule 2' AND e.first_meal_start IS NOT NULL AND e.second_meal_start IS NOT NULL AND e.mins_to_second_meal > 600 AND e.second_meal_duration < 30 THEN 'Late second meal + insufficient duration - Violation'
+            ELSE NULL
+        END AS system_result
+    FROM (
+        SELECT
+            b.store_number, b.employee_id, b.first_name, b.last_name, b.job_code, b.busi_date,
+            b.clockin_min, b.clockout_min, b.shift_min,
+            b.first_meal_start, b.first_meal_end, b.second_meal_start, b.second_meal_end,
+            b.meal_viol_count, b.meal_viol_pay, b.noofbrkviolation,
+            (b.first_meal_start - b.clockin_min) AS mins_to_first_meal,
+            (b.first_meal_end - b.first_meal_start) AS first_meal_duration,
+            (b.second_meal_start - b.clockin_min) AS mins_to_second_meal,
+            (b.second_meal_end - b.second_meal_start) AS second_meal_duration,
+            CASE
+                WHEN b.shift_min >= 300 AND b.shift_min <= 360 THEN 'Rule 1'
+                WHEN b.shift_min > 360 AND b.shift_min < 600 THEN 'Rule 3'
+                WHEN b.shift_min > 600 AND b.shift_min <= 720 THEN 'Rule 2'
+                ELSE 'No Rule Applies'
+            END AS rule_number
+        FROM (
+            SELECT
+                s.id AS store_number,
+                em.employeeId AS employee_id,
+                em.firstName AS first_name,
+                em.lastName AS last_name,
+                jct.jobCodeDesc AS job_code,
+                p.busidate AS busi_date,
+                p.starttime AS clockin_min,
+                p.endtime AS clockout_min,
+                (p.endtime - p.starttime) AS shift_min,
+                fm.first_meal_start, fm.first_meal_end,
+                sm.second_meal_start, sm.second_meal_end,
+                vp.meal_viol_count, vp.meal_viol_pay,
+                p.noofbrkviolation
+            FROM EOTdyEmpPunDetail p
+            JOIN EOTdyEmpDetail d ON p.eotdyempdetailid = d.primarykey
+            JOIN EOTdyMain tm ON d.eotdymainid = tm.primarykey
+            JOIN EOTwkMain wm ON tm.eotwkmainid = wm.primarykey
+            JOIN EOSiteMain s ON wm.eositemainid = s.primarykey
+            JOIN EOTwkEmpDetail wed ON d.eotwkempdetailid = wed.primarykey
+            JOIN EOEmpMain em ON wed.eoempmainid = em.primarykey
+            LEFT JOIN EOEmpJobCode ejc ON p.eoempjobcodeid = ejc.primarykey
+            LEFT JOIN EOCustJobTitle jct ON ejc.eocustjobtitleid = jct.primarykey
+            LEFT JOIN (
+                SELECT eotdyemppundetailid, starttime AS first_meal_start, endtime AS first_meal_end
+                FROM (
+                    SELECT eotdyemppundetailid, starttime, endtime,
+                           ROW_NUMBER() OVER (PARTITION BY eotdyemppundetailid ORDER BY starttime) AS rn
+                    FROM EOTdyEmpBrkDetail WHERE brktype = 0
+                ) mb1 WHERE rn = 1
+            ) fm ON fm.eotdyemppundetailid = p.primarykey
+            LEFT JOIN (
+                SELECT eotdyemppundetailid, starttime AS second_meal_start, endtime AS second_meal_end
+                FROM (
+                    SELECT eotdyemppundetailid, starttime, endtime,
+                           ROW_NUMBER() OVER (PARTITION BY eotdyemppundetailid ORDER BY starttime) AS rn
+                    FROM EOTdyEmpBrkDetail WHERE brktype = 0
+                ) mb2 WHERE rn = 2
+            ) sm ON sm.eotdyemppundetailid = p.primarykey
+            LEFT JOIN (
+                SELECT pp.eotdyemppundetailid, SUM(pp.noofviolation) AS meal_viol_count, SUM(pp.payrate) AS meal_viol_pay
+                FROM EOTdyEmpPunViolPay pp
+                JOIN EOCustViolPay ecv ON ecv.primarykey = pp.eocustviolpayid
+                WHERE ecv.typeiid = 0
+                GROUP BY pp.eotdyemppundetailid
+            ) vp ON vp.eotdyemppundetailid = p.primarykey
+            WHERE p.busidate BETWEEN '${start}' AND '${end}'${storeClause}
+              AND em.isenablemealbreakwaiver = true
+              AND (p.statusiid IS NULL OR p.statusiid != 'DELETED')
+        ) b
+    ) e
+) f
+WHERE ${caseClause}${impactedClause}
+ORDER BY f.busi_date, f.last_name, f.first_name;`;
+
+  lastFormattedSql = sql;
+  lastSingleLineSql = toSingleLine(sql);
+  renderSql();
+  document.getElementById('status').textContent = '';
+
+  const storeMsg = allStores ? 'all stores' : (storeQuoted.length + ' store(s)');
+  showToast('Query generated successfully — ' + checkedCases.length + ' case(s), ' + storeMsg + ', ' + start + ' to ' + end + '.', false);
+}
+
+function toSingleLine(sql){
+  return sql.replace(/\s+/g, ' ').trim();
+}
+
+function renderSql(){
+  const text = currentFormat === 'single' ? lastSingleLineSql : lastFormattedSql;
+  document.getElementById('sqlOut').textContent = text || 'Click "Generate Query" to build the SQL for the selected filters.';
+}
+
+function setFormat(mode){
+  currentFormat = mode;
+  document.getElementById('fmtMultiBtn').classList.toggle('active', mode === 'multi');
+  document.getElementById('fmtSingleBtn').classList.toggle('active', mode === 'single');
+  renderSql();
+}
+
+function copyQuery(){
+  const text = document.getElementById('sqlOut').textContent;
+  if(!text || text.indexOf('SELECT') === -1){
+    showToast('Generate the query first.', true);
+    return;
+  }
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Query copied to clipboard!', false);
+  });
+}
+
+function downloadQuery(){
+  const text = document.getElementById('sqlOut').textContent;
+  if(!text || text.indexOf('SELECT') === -1){
+    showToast('Generate the query first.', true);
+    return;
+  }
+  const blob = new Blob([text], {type: 'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'meal_break_impacted_punches' + (currentFormat === 'single' ? '_singleline' : '') + '.sql';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Query file downloaded.', false);
+}
+
+// generate once on load with defaults
+window.addEventListener('DOMContentLoaded', generateQuery);
+</script>
+</body>
+</html>
