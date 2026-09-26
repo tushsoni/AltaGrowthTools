@@ -1,0 +1,2739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Scheduling — Run Animation</title>
+<style>
+  :root{
+    /* ---- light theme (default) ---- */
+    --page-bg:
+      radial-gradient(1200px 600px at 15% -10%, #dfe6f9 0%, transparent 60%),
+      radial-gradient(1000px 500px at 110% 10%, #e4e0fb 0%, transparent 55%),
+      #eef1f7;
+    --modal-bg: linear-gradient(180deg, #ffffff, #f3f5fb);
+    --border:#e2e6f3;
+    --border-soft: rgba(28,36,64,.08);
+    --text:#1c2440;
+    --text-dim:#5a6485;
+    --text-faint:#8b93ad;
+    --surface-recessed: rgba(28,36,64,.035);
+    --surface-raised: rgba(28,36,64,.045);
+    --surface-raised-hover: rgba(28,36,64,.09);
+    --grid-line: rgba(28,36,64,.08);
+    --grid-row-bg: rgba(28,36,64,.02);
+    --card-bg:#ffffff;
+    --card-border:#e2e6f3;
+    --scrollbar-thumb:#cdd4e8;
+    --variant-good-color:#158a44;
+    --variant-warn-color:#a5580c;
+    --circle-bg:#ffffff;
+
+    --blue:#3b82f6;
+    --blue-light:#2563eb;
+    --purple:#8b5cf6;
+    --green:#16a34a;
+    --amber:#f59e0b;
+    --red:#ef4444;
+    --cyan:#06b6d4;
+    --pink:#ec4899;
+    --lime:#84cc16;
+    --yellow:#eab308;
+    --rose:#f43f5e;
+    --teal:#14b8a6;
+    --orange:#f97316;
+  }
+  [data-theme="dark"]{
+    --page-bg:
+      radial-gradient(1200px 600px at 15% -10%, rgba(59,90,190,.18) 0%, transparent 60%),
+      radial-gradient(1000px 500px at 110% 10%, rgba(139,92,246,.16) 0%, transparent 55%),
+      #0a1122;
+    --modal-bg: linear-gradient(180deg, #0e1730, #0a1122);
+    --border:#2a3868;
+    --border-soft: rgba(255,255,255,.06);
+    --text:#e7ecff;
+    --text-dim:#93a0c4;
+    --text-faint:#5f6c94;
+    --surface-recessed: rgba(0,0,0,.18);
+    --surface-raised: rgba(255,255,255,.03);
+    --surface-raised-hover: rgba(255,255,255,.08);
+    --grid-line: rgba(255,255,255,.05);
+    --grid-row-bg: rgba(255,255,255,.02);
+    --card-bg:#101a30;
+    --card-border:#2a3868;
+    --scrollbar-thumb:#33407a;
+    --variant-good-color:#9fe0b4;
+    --variant-warn-color:#f4c77c;
+    --circle-bg:#17223f;
+
+    --blue-light:#60a5fa;
+    --green:#22c55e;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background: var(--page-bg);
+    transition: background .3s ease;
+    font-family:'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+    color:var(--text);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    gap:22px;
+    padding:40px 16px;
+  }
+
+  .theme-toggle{
+    width:34px; height:34px; border-radius:9px; border:1px solid var(--border);
+    background:var(--surface-raised); color:var(--text-dim); cursor:pointer;
+    font-size:15px; display:flex; align-items:center; justify-content:center;
+    transition:background .15s, color .15s, transform .15s;
+  }
+  .theme-toggle:hover{ background:var(--surface-raised-hover); color:var(--text); transform:translateY(-1px); }
+
+  .top-controls{ position:fixed; top:20px; right:20px; z-index:40; display:flex; align-items:center; gap:10px; }
+  .top-controls .theme-toggle{ background:var(--card-bg); }
+  .settings-wrap{ position:relative; }
+  .settings-panel{
+    position:absolute; top:calc(100% + 10px); right:0; width:300px;
+    background:var(--card-bg); border:1px solid var(--card-border); border-radius:14px;
+    box-shadow:0 18px 40px -16px rgba(20,30,70,.35); padding:10px;
+    opacity:0; transform:translateY(-6px) scale(.97); pointer-events:none;
+    transition:opacity .18s ease, transform .18s ease;
+  }
+  .settings-panel.open{ opacity:1; transform:translateY(0) scale(1); pointer-events:auto; }
+  .settings-panel-head{ font-size:11px; font-weight:700; color:var(--text-faint); text-transform:uppercase; letter-spacing:.5px; margin:4px 8px 6px; }
+  .version-row{ position:relative; display:flex; align-items:flex-start; gap:10px; padding:9px 8px; border-radius:10px; cursor:pointer; transition:background .15s; }
+  .version-row:hover{ background:var(--surface-raised); }
+  .version-row input{ position:absolute; opacity:0; width:1px; height:1px; }
+  .version-radio{
+    width:16px; height:16px; border-radius:50%; border:2px solid var(--border); flex:none; margin-top:2px;
+    display:flex; align-items:center; justify-content:center; transition:border-color .15s;
+  }
+  .version-radio::after{ content:''; width:8px; height:8px; border-radius:50%; background:#4f6ef7; transform:scale(0); transition:transform .15s; }
+  .version-row input:checked ~ .version-radio{ border-color:#4f6ef7; }
+  .version-row input:checked ~ .version-radio::after{ transform:scale(1); }
+  .version-text{ display:flex; flex-direction:column; }
+  .version-title{ font-size:12.5px; font-weight:600; color:var(--text); }
+  .version-desc{ font-size:11px; color:var(--text-dim); margin-top:2px; line-height:1.4; }
+
+  /* ---------- Trigger page behind modal ---------- */
+  .trigger-card{
+    background:var(--card-bg);
+    border:1px solid var(--card-border);
+    border-radius:18px;
+    padding:34px 40px;
+    max-width:520px;
+    text-align:center;
+    box-shadow:0 18px 45px -20px rgba(30,41,90,.25);
+    transition:background .3s ease, border-color .3s ease;
+  }
+  .trigger-card h1{
+    font-size:22px;
+    margin:0 0 8px;
+    color:var(--text);
+    letter-spacing:.2px;
+  }
+  .trigger-card p{
+    margin:0 0 22px;
+    color:var(--text-dim);
+    font-size:14px;
+    line-height:1.6;
+  }
+  .run-btn{
+    appearance:none;
+    border:none;
+    cursor:pointer;
+    padding:13px 26px;
+    border-radius:12px;
+    font-size:14.5px;
+    font-weight:600;
+    color:#fff;
+    background:linear-gradient(135deg,#4f6ef7,#8b5cf6);
+    box-shadow:0 12px 24px -10px rgba(90,80,240,.55);
+    display:inline-flex;
+    align-items:center;
+    gap:9px;
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .run-btn:hover{ transform:translateY(-1px); box-shadow:0 16px 28px -10px rgba(90,80,240,.65); }
+  .run-btn:active{ transform:translateY(0); }
+
+  #status-banner{
+    max-width:640px;
+    background:var(--card-bg);
+    border:1px solid var(--card-border);
+    border-left:4px solid var(--green);
+    border-radius:12px;
+    padding:14px 18px;
+    font-size:13.5px;
+    color:var(--text);
+    box-shadow:0 10px 24px -16px rgba(30,41,90,.3);
+    display:none;
+    align-items:center;
+    gap:10px;
+  }
+  #status-banner.show{ display:flex; animation:fadeInUp .4s ease; }
+
+  /* ---------- Overlay & modal ---------- */
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(8,12,26,.55);
+    backdrop-filter:blur(6px);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:999;
+    opacity:0;
+    transition:opacity .25s ease;
+  }
+  .overlay.open{ display:flex; }
+  .overlay.visible{ opacity:1; }
+
+  .modal{
+    width:1180px;
+    max-width:96vw;
+    height:720px;
+    max-height:92vh;
+    background:var(--modal-bg);
+    border:1px solid var(--border);
+    border-radius:20px;
+    box-shadow:0 40px 90px -30px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.02) inset;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    transform:translateY(18px) scale(.98);
+    transition:transform .3s cubic-bezier(.2,.9,.3,1.2);
+  }
+  .overlay.visible .modal{ transform:translateY(0) scale(1); }
+
+  /* header */
+  .m-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 24px 14px;
+    border-bottom:1px solid var(--border);
+    background:linear-gradient(90deg, rgba(59,130,246,.12), rgba(139,92,246,.10));
+    flex:none;
+  }
+  .m-header-left{ display:flex; align-items:center; gap:13px; }
+  .ai-orb{
+    width:38px; height:38px; border-radius:11px;
+    background:linear-gradient(135deg, var(--blue), var(--purple));
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px;
+    box-shadow:0 0 0 4px rgba(139,92,246,.15), 0 8px 18px -6px rgba(90,80,240,.6);
+    position:relative;
+    flex:none;
+  }
+  .ai-orb::after{
+    content:''; position:absolute; inset:-6px; border-radius:16px;
+    border:1.5px solid rgba(139,92,246,.35);
+    animation:pulseRing 2.2s ease-out infinite;
+  }
+  .m-title{ font-size:16px; font-weight:700; color:var(--text); letter-spacing:.2px; }
+  .m-subtitle{ font-size:12px; color:var(--text-dim); margin-top:2px; display:flex; align-items:center; gap:7px; }
+  .m-subtitle .dot{ width:6px; height:6px; border-radius:50%; background:var(--blue-light); animation:blink 1.1s ease-in-out infinite; }
+  .m-header-right{ display:flex; align-items:center; gap:8px; flex:none; }
+  .m-close{
+    width:32px; height:32px; border-radius:9px; border:1px solid var(--border);
+    background:var(--surface-raised); color:var(--text-dim); cursor:pointer;
+    font-size:15px; display:flex; align-items:center; justify-content:center;
+    transition:background .15s, color .15s;
+  }
+  .m-close:hover{ background:var(--surface-raised-hover); color:var(--text); }
+
+  /* stepper — a single line runs through the vertical center of every
+     circle; the circles use a fully OPAQUE background (not a translucent
+     tint) and paint above the line via z-index, so the line visibly
+     enters/exits each circle without ever showing across the icon itself */
+  .stepper-wrap{ padding:16px 24px 6px; flex:none; }
+  .stepper{ display:flex; align-items:flex-start; justify-content:space-between; position:relative; }
+  .stepper::before{
+    content:''; position:absolute; top:16px; left:40px; right:40px; height:2px;
+    background:var(--border); z-index:0;
+  }
+  .stepper .fill-line{
+    position:absolute; top:16px; left:40px; height:2px;
+    background:linear-gradient(90deg, var(--blue), var(--purple));
+    width:0px; transition:width .5s ease; z-index:1;
+  }
+  .step{
+    position:relative; z-index:2; display:flex; flex-direction:column; align-items:center;
+    width:80px; flex:none;
+  }
+  .step .circle{
+    width:33px; height:33px; border-radius:50%; background:var(--circle-bg);
+    border:2px solid var(--border); display:flex; align-items:center; justify-content:center;
+    font-size:14px; color:var(--text-faint); transition:all .35s ease; position:relative;
+  }
+  .step .label{
+    font-size:9.5px; margin-top:7px; color:var(--text-faint); text-align:center; line-height:1.25;
+    max-width:78px; transition:color .3s ease; font-weight:600; letter-spacing:.2px;
+  }
+  .step.active .circle{
+    border-color:var(--blue-light); background:var(--blue-light);
+    color:#fff; box-shadow:0 0 0 5px rgba(59,130,246,.16);
+  }
+  .step.active .circle::after{
+    content:''; position:absolute; inset:-6px; border-radius:50%;
+    border:2px solid rgba(96,165,250,.5); animation:pulseRing 1.6s ease-out infinite;
+  }
+  .step.active .label{ color:var(--text); }
+  .step.done .circle{ border-color:var(--green); background:var(--green); color:#fff; }
+  .step.done .label{ color:var(--text-dim); }
+
+  /* KPI strip */
+  .kpi-strip{ display:flex; gap:12px; padding:14px 24px; flex:none; }
+  .kpi-tile{
+    flex:1; background:var(--kc-bg, var(--surface-raised)); border:1px solid var(--kc-border, var(--border));
+    border-radius:12px; padding:11px 14px; position:relative; overflow:hidden;
+  }
+  .kpi-tile .kpi-label{ font-size:10.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+  .kpi-tile .kpi-value{ font-size:21px; font-weight:700; color:var(--text); margin-top:3px; font-variant-numeric:tabular-nums; }
+  .kpi-tile .kpi-value .kpi-unit{ font-size:12px; color:var(--text-dim); font-weight:500; margin-left:2px;}
+  /* solid-color icon badge, absolutely positioned so it never affects the
+     tile's box size/padding — pastel tile backgrounds set per-color below */
+  .kpi-icon{
+    position:absolute; top:10px; right:10px; width:26px; height:26px; border-radius:7px;
+    background:var(--kc-icon, var(--blue)); color:#fff; display:flex; align-items:center; justify-content:center;
+  }
+  .kpi-icon svg{ width:13px; height:13px; }
+  .kpi-tile.blue{   --kc-bg:#eef4ff; --kc-border:#dbe7fd; --kc-icon:#3b82f6; }
+  .kpi-tile.purple{ --kc-bg:#f5f1ff; --kc-border:#e6dcfc; --kc-icon:#8b5cf6; }
+  .kpi-tile.green{  --kc-bg:#eefdf4; --kc-border:#d3f5e2; --kc-icon:#22c55e; }
+  .kpi-tile.orange{ --kc-bg:#fff5ec; --kc-border:#fce0c2; --kc-icon:#f97316; }
+  [data-theme="dark"] .kpi-tile.blue{   --kc-bg:rgba(59,130,246,.1);  --kc-border:rgba(59,130,246,.25); }
+  [data-theme="dark"] .kpi-tile.purple{ --kc-bg:rgba(139,92,246,.1); --kc-border:rgba(139,92,246,.25); }
+  [data-theme="dark"] .kpi-tile.green{  --kc-bg:rgba(34,197,94,.1);  --kc-border:rgba(34,197,94,.25); }
+  [data-theme="dark"] .kpi-tile.orange{ --kc-bg:rgba(249,115,22,.1); --kc-border:rgba(249,115,22,.25); }
+
+  /* body split */
+  .m-body{ flex:1; display:flex; gap:14px; padding:2px 24px 16px; min-height:0; }
+  .log-panel{
+    width:290px; flex:none; background:var(--surface-recessed); border:1px solid var(--border);
+    border-radius:12px; display:flex; flex-direction:column; min-height:0;
+    position:relative; overflow:hidden;
+  }
+  .log-panel::before{
+    content:''; position:absolute; inset:0; border-radius:12px; padding:1.5px; z-index:0;
+    background:linear-gradient(120deg, #3b82f6, #8b5cf6, #ec4899, #3b82f6);
+    background-size:300% 300%; animation:aiGlow 7s ease infinite;
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor; mask-composite:exclude;
+    opacity:.55; pointer-events:none;
+  }
+  .log-panel-head{
+    position:relative; z-index:1;
+    padding:10px 13px; border-bottom:1px solid var(--border); font-size:11px; font-weight:700;
+    letter-spacing:.6px; display:flex; align-items:center; gap:7px; flex:none;
+  }
+  .log-panel-head-text{
+    background:linear-gradient(90deg, var(--blue-light), #8b5cf6, #ec4899);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-transform:uppercase;
+  }
+  .live-dot{ width:6px; height:6px; border-radius:50%; background:#22c55e; position:relative; margin-left:auto; flex:none; }
+  .live-dot::after{
+    content:''; position:absolute; inset:-4px; border-radius:50%; border:2px solid rgba(34,197,94,.5);
+    animation:pulseRing 1.5s ease-out infinite;
+  }
+  .log-list{ position:relative; z-index:1; flex:1; overflow-y:auto; padding:8px 10px; display:flex; flex-direction:column; gap:2px; }
+  .log-line{
+    font-size:12px; line-height:1.5; color:var(--text-dim); padding:6px 7px; border-radius:7px;
+    display:flex; gap:8px; opacity:0; transform:translateY(4px);
+    animation:logIn .35s ease forwards, logHighlight 1.4s ease forwards;
+  }
+  .log-line .li-icon{ flex:none; }
+  .log-line .li-text{ color:var(--text); }
+  .log-line.variant-good .li-text{ color:var(--variant-good-color); }
+  .log-line.variant-warn .li-text{ color:var(--variant-warn-color); }
+  .log-line.variant-head{ margin-top:4px; }
+  .log-line.variant-head .li-text{ color:var(--blue-light); font-weight:700; }
+
+  .grid-panel{ flex:1; min-width:0; display:flex; flex-direction:column; gap:10px; min-height:0; }
+  .grid-card{
+    flex:1; background:var(--surface-recessed); border:1px solid var(--border); border-radius:12px;
+    padding:12px 14px 10px; overflow:hidden; min-height:0;
+  }
+  .ruler{ position:relative; height:16px; margin:0 0 6px 100px; }
+  .ruler span{
+    position:absolute; top:0; transform:translateX(-50%); font-size:9.5px; color:var(--text-faint);
+    font-variant-numeric:tabular-nums;
+  }
+  .row-block{ display:flex; align-items:center; margin-bottom:4px; }
+  .row-block:last-child{ margin-bottom:0; }
+  .row-label{
+    width:100px; flex:none; padding-right:8px; font-size:11.5px; font-weight:700; color:var(--text-dim);
+  }
+  .row-label small{ display:block; font-size:9.5px; font-weight:500; color:var(--text-faint); margin-top:1px; }
+  .row-label-emp{ display:flex; align-items:center; gap:7px; }
+  .row-avatar{
+    width:22px; height:22px; border-radius:50%; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    font-size:8px; font-weight:800; letter-spacing:.2px;
+  }
+  .row-skel{ display:flex; flex-direction:column; gap:4px; }
+  .row-skel span{ display:block; height:5px; border-radius:4px; background:var(--surface-raised-hover); }
+  .row-skel span:first-child{ width:46px; }
+  .row-skel span:last-child{ width:28px; }
+  .grid-row{
+    position:relative; flex:1; height:30px; border-radius:7px;
+    background:
+      repeating-linear-gradient(90deg, var(--grid-line) 0, var(--grid-line) 1px, transparent 1px, transparent calc(100%/8));
+    background-color:var(--grid-row-bg);
+    border:1px solid var(--border-soft);
+  }
+  .grid-row.tray-row{ border-style:dashed; background-color:rgba(245,158,11,.03); }
+
+  .shift-block{
+    position:absolute; top:3px; bottom:3px;
+    border-radius:8px; overflow:hidden;
+    display:flex; align-items:center; gap:5px; padding:0 7px;
+    font-size:10.5px; color:#fff; white-space:nowrap;
+    box-shadow:0 4px 10px -4px rgba(0,0,0,.5);
+    transition:left .55s cubic-bezier(.4,0,.2,1), width .55s cubic-bezier(.4,0,.2,1),
+               background .4s ease, opacity .4s ease, transform .4s ease, box-shadow .3s ease;
+  }
+  .shift-block .block-time{ opacity:.92; font-weight:500; }
+  .shift-block .break-marker{
+    position:absolute; right:6px; top:50%; transform:translateY(-50%) scale(0);
+    color:#ef4444; filter:drop-shadow(0 1px 1px rgba(0,0,0,.6));
+  }
+  .shift-block .break-marker svg{ width:12px; height:12px; }
+  .shift-block .break-marker.show{ animation:breakPop .5s cubic-bezier(.3,1.7,.4,1) forwards; }
+
+  /* standard/assigned/priority blocks get their color inline from the row's
+     own color (see ROW_COLORS/applyRowColor) — status only still matters
+     for open/unassigned shifts, which stay the amber "not yet owned" look */
+  .status-variable{
+    background:repeating-linear-gradient(45deg, rgba(245,158,11,.9) 0 7px, rgba(251,191,36,.85) 7px 14px);
+    border:1.5px dashed rgba(180,83,9,.9); color:#3a2405;
+  }
+  .status-merged{ background:repeating-linear-gradient(45deg, rgba(245,158,11,.9) 0 7px, rgba(251,191,36,.85) 7px 14px); border:1.5px dashed rgba(180,83,9,.9); color:#3a2405; }
+
+  .shift-block.flash{ animation:flashRing 1s ease; }
+  .shift-block.swap-glow{ box-shadow:0 0 0 3px rgba(139,92,246,.55), 0 4px 10px -4px rgba(0,0,0,.5); }
+  .shift-block.priority-glow{ box-shadow:0 0 0 3px rgba(139,92,246,.6), 0 0 18px 2px rgba(139,92,246,.45); }
+
+  /* loading skeleton — placeholder bars shown before real shifts are imported */
+  .skeleton-bar{
+    position:absolute; top:4px; bottom:4px; border-radius:8px; pointer-events:none;
+    animation:skeletonPulse 1.6s ease-in-out infinite;
+  }
+  .skeleton-bar.sk-blue{ background:#7fb2f0; }
+  .skeleton-bar.sk-ghost{ background:#dbe4f2; }
+  .skeleton-bar.sk-orange{ background:#f7b47a; }
+  .skeleton-bar.sk-green{ background:#7fe0b3; }
+  [data-theme="dark"] .skeleton-bar{ --sk-max:.8; }
+  @keyframes skeletonPulse{ 0%,100%{ opacity:.5; } 50%{ opacity:var(--sk-max, 1); } }
+
+  .swap-indicator{
+    position:absolute; z-index:5; font-size:17px; color:var(--ind-color, var(--purple));
+    background:var(--card-bg); border:1px solid var(--ind-color, var(--purple)); border-radius:50%;
+    width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+    transform:translate(-50%,-50%) scale(0); opacity:0;
+    box-shadow:0 0 14px 2px var(--ind-glow, rgba(139,92,246,.5));
+  }
+  .swap-indicator.show{ animation:swapPop 1.3s cubic-bezier(.3,1.6,.4,1) forwards; }
+
+  /* footer */
+  .m-footer{
+    flex:none; padding:14px 24px 18px; border-top:1px solid var(--border);
+    display:flex; align-items:center; gap:16px;
+    background:var(--surface-recessed);
+  }
+  .progress-track{
+    flex:1; height:8px; border-radius:5px; background:var(--surface-raised-hover); overflow:hidden; position:relative;
+  }
+  .progress-fill{
+    height:100%; width:0%; border-radius:5px;
+    background:linear-gradient(90deg, var(--blue), var(--purple));
+    transition:width .5s ease;
+  }
+  .progress-fill::after{
+    content:''; position:absolute; inset:0; background:linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
+    width:60px; animation:shimmer 1.4s linear infinite;
+  }
+  .footer-text{ font-size:12px; color:var(--text-dim); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .footer-btn{
+    appearance:none; border:1px solid var(--border); background:var(--surface-raised); color:var(--text-dim);
+    padding:9px 16px; border-radius:9px; font-size:12.5px; font-weight:600; cursor:pointer; transition:.15s;
+  }
+  .footer-btn:hover{ background:var(--surface-raised-hover); color:var(--text); }
+  .footer-btn.primary{
+    background:linear-gradient(135deg,#4f6ef7,#8b5cf6); color:#fff; border:none;
+    box-shadow:0 8px 18px -8px rgba(90,80,240,.6);
+  }
+  .footer-btn.primary:hover{ filter:brightness(1.08); }
+  .footer-btn[hidden]{ display:none; }
+
+  /* completion overlay */
+  .complete-layer{
+    position:absolute; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
+    background:rgba(9,14,30,.72); backdrop-filter:blur(3px);
+    opacity:0; pointer-events:none; transition:opacity .4s ease;
+  }
+  .complete-layer.show{ opacity:1; pointer-events:auto; }
+  .complete-card{
+    width:520px; max-width:90%; background:var(--modal-bg);
+    border:1px solid var(--border); border-radius:18px; padding:30px 32px; text-align:center;
+    transform:translateY(14px) scale(.96); transition:transform .4s cubic-bezier(.2,.9,.3,1.2);
+    box-shadow:0 30px 70px -20px rgba(0,0,0,.6);
+  }
+  .complete-layer.show .complete-card{ transform:translateY(0) scale(1); }
+  .complete-check{
+    width:68px; height:68px; border-radius:50%; margin:0 auto 16px; position:relative;
+    background:linear-gradient(135deg, var(--green), #059669);
+    display:flex; align-items:center; justify-content:center; color:#fff;
+    box-shadow:0 10px 24px -8px rgba(34,197,94,.45);
+    animation:completeCheckPop .5s cubic-bezier(.3,1.6,.4,1);
+  }
+  .complete-check svg{ width:30px; height:30px; stroke-width:2.5; }
+  .complete-check::after{
+    content:''; position:absolute; inset:-8px; border-radius:50%; border:2px solid rgba(34,197,94,.35);
+    animation:pulseRing 1.8s ease-out infinite;
+  }
+  @keyframes completeCheckPop{ 0%{ transform:scale(0); opacity:0; } 60%{ transform:scale(1.15); opacity:1; } 100%{ transform:scale(1); } }
+  .complete-card h2{ margin:0 0 6px; color:var(--text); font-size:20px; }
+  .complete-card p{ margin:0 0 22px; color:var(--text-dim); font-size:13px; }
+  .complete-stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:24px; }
+  .cstat{
+    position:relative; overflow:hidden; display:flex; flex-direction:column; align-items:center; gap:7px;
+    background:var(--kc-bg, var(--surface-raised)); border:1px solid var(--kc-border, var(--border));
+    border-radius:12px; padding:14px 8px 12px;
+  }
+  .cstat-icon{ width:26px; height:26px; border-radius:7px; background:var(--kc-icon, var(--text-faint)); color:#fff; display:flex; align-items:center; justify-content:center; }
+  .cstat-icon svg{ width:13px; height:13px; }
+  .cstat .cv{ font-size:20px; font-weight:800; color:var(--text); }
+  .cstat .cl{ font-size:9.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.4px; }
+  .cstat.warn .cv{ color:var(--variant-warn-color); }
+  .cstat.blue{   --kc-bg:#eef4ff; --kc-border:#dbe7fd; --kc-icon:#3b82f6; }
+  .cstat.purple{ --kc-bg:#f5f1ff; --kc-border:#e6dcfc; --kc-icon:#8b5cf6; }
+  .cstat.green{  --kc-bg:#eefdf4; --kc-border:#d3f5e2; --kc-icon:#22c55e; }
+  .cstat.teal{   --kc-bg:#ecfdf9; --kc-border:#c8f2e8; --kc-icon:#14b8a6; }
+  .cstat.indigo{ --kc-bg:#eef0ff; --kc-border:#dfe3fd; --kc-icon:#6366f1; }
+  .cstat.orange{ --kc-bg:#fff5ec; --kc-border:#fce0c2; --kc-icon:#f97316; }
+  [data-theme="dark"] .cstat.blue{   --kc-bg:rgba(59,130,246,.1);  --kc-border:rgba(59,130,246,.25); }
+  [data-theme="dark"] .cstat.purple{ --kc-bg:rgba(139,92,246,.1); --kc-border:rgba(139,92,246,.25); }
+  [data-theme="dark"] .cstat.green{  --kc-bg:rgba(34,197,94,.1);  --kc-border:rgba(34,197,94,.25); }
+  [data-theme="dark"] .cstat.teal{   --kc-bg:rgba(20,184,166,.1); --kc-border:rgba(20,184,166,.25); }
+  [data-theme="dark"] .cstat.indigo{ --kc-bg:rgba(99,102,241,.1); --kc-border:rgba(99,102,241,.25); }
+  [data-theme="dark"] .cstat.orange{ --kc-bg:rgba(249,115,22,.1); --kc-border:rgba(249,115,22,.25); }
+  .complete-actions{ display:flex; gap:10px; justify-content:center; }
+
+  .confetti{ position:absolute; top:-10px; border-radius:2px; opacity:.9; pointer-events:none; z-index:25; }
+
+  /* ---------- Premium line icons (Lucide) ---------- */
+  .lucide{ stroke-width:1.75; vertical-align:middle; display:block; flex:none; }
+  .ai-orb{ color:#fff; }
+  .ai-orb svg{ width:19px; height:19px; }
+  .m-close svg{ width:15px; height:15px; }
+  .theme-toggle svg{ width:16px; height:16px; }
+  .theme-toggle .icon-sun{ display:none; }
+  [data-theme="dark"] .theme-toggle .icon-moon{ display:none; }
+  [data-theme="dark"] .theme-toggle .icon-sun{ display:block; }
+  .run-btn svg{ width:16px; height:16px; }
+  .step .circle svg{ width:16px; height:16px; }
+  .log-panel-head{ display:flex; align-items:center; gap:7px; }
+  .log-panel-head svg{ width:13px; height:13px; color:var(--blue-light); }
+  .li-icon{ color:var(--text-dim); display:flex; align-items:flex-start; padding-top:1px; }
+  .li-icon svg{ width:14px; height:14px; }
+  .log-line.variant-good .li-icon{ color:var(--variant-good-color); }
+  .log-line.variant-warn .li-icon{ color:var(--variant-warn-color); }
+  .log-line.variant-head .li-icon{ color:var(--blue-light); }
+  .swap-indicator svg{ width:15px; height:15px; }
+  .complete-check svg{ width:30px; height:30px; }
+  .footer-btn{ display:inline-flex; align-items:center; gap:6px; }
+  .footer-btn svg{ width:14px; height:14px; }
+
+  /* keyframes */
+  @keyframes fadeInUp{ from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
+  @keyframes pulseRing{ 0%{ transform:scale(.85); opacity:.9;} 100%{ transform:scale(1.5); opacity:0;} }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
+  @keyframes logIn{ to{ opacity:1; transform:translateY(0); } }
+  @keyframes logHighlight{ 0%{ background:rgba(99,102,241,.16); } 100%{ background:transparent; } }
+  @keyframes aiGlow{ 0%,100%{ background-position:0% 50%; } 50%{ background-position:100% 50%; } }
+  @keyframes breakPop{ 0%{ transform:translateY(-50%) scale(0);} 60%{ transform:translateY(-50%) scale(1.4);} 100%{ transform:translateY(-50%) scale(1);} }
+  @keyframes flashRing{ 0%{ box-shadow:0 0 0 0 rgba(239,68,68,.7);} 100%{ box-shadow:0 0 0 10px rgba(239,68,68,0);} }
+  @keyframes swapPop{
+    0%{ transform:translate(-50%,-50%) scale(0); opacity:0; }
+    18%{ transform:translate(-50%,-50%) scale(1.2) rotate(0deg); opacity:1; }
+    50%{ transform:translate(-50%,-50%) scale(1) rotate(180deg); opacity:1; }
+    85%{ transform:translate(-50%,-50%) scale(1) rotate(360deg); opacity:1; }
+    100%{ transform:translate(-50%,-50%) scale(.6) rotate(360deg); opacity:0; }
+  }
+  @keyframes shimmer{ from{ transform:translateX(-80px);} to{ transform:translateX(340px);} }
+  @keyframes confettiFall{
+    from{ transform:translateY(0) rotate(0deg); opacity:1; }
+    to{ transform:translateY(420px) rotate(340deg); opacity:0; }
+  }
+
+  ::-webkit-scrollbar{ width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--scrollbar-thumb); border-radius:8px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+
+  /* =====================================================================
+     V2 — "Aurora": animated gradient banner + clean content card
+     ===================================================================== */
+  .modal-v2b{
+    width:660px; max-width:94vw; max-height:92vh;
+    background:var(--modal-bg); border:1px solid var(--border); border-radius:22px;
+    display:flex; flex-direction:column; overflow:hidden;
+    box-shadow:0 40px 90px -30px rgba(0,0,0,.6);
+    transform:translateY(18px) scale(.98);
+    transition:transform .3s cubic-bezier(.2,.9,.3,1.2);
+  }
+  .overlay.visible .modal-v2b{ transform:translateY(0) scale(1); }
+
+  .av2-banner{
+    position:relative; overflow:hidden; flex:none;
+    background:#0c1024; padding:20px 24px 22px;
+  }
+  .av2-blob{ position:absolute; border-radius:50%; filter:blur(60px); opacity:.65; will-change:transform; }
+  .av2-blob-1{ width:260px; height:260px; background:#6366f1; top:-90px; left:-60px; animation:av2Float1 17s ease-in-out infinite; }
+  .av2-blob-2{ width:230px; height:230px; background:#d946ef; bottom:-100px; right:-40px; animation:av2Float2 21s ease-in-out infinite; }
+  .av2-blob-3{ width:190px; height:190px; background:#22d3ee; top:20px; right:60px; animation:av2Float3 13s ease-in-out infinite; }
+  @keyframes av2Float1{ 0%,100%{ transform:translate(0,0) scale(1); } 50%{ transform:translate(30px,20px) scale(1.12); } }
+  @keyframes av2Float2{ 0%,100%{ transform:translate(0,0) scale(1); } 50%{ transform:translate(-24px,-16px) scale(1.08); } }
+  @keyframes av2Float3{ 0%,100%{ transform:translate(0,0) scale(1); } 50%{ transform:translate(-18px,14px) scale(.9); } }
+
+  .av2-banner-head{ position:relative; z-index:2; display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+  .av2-banner-title{ display:flex; align-items:center; gap:9px; font-size:14px; font-weight:700; color:#fff; }
+  .av2-banner-title svg{ width:16px; height:16px; }
+  .av2-banner-right{ display:flex; align-items:center; gap:10px; }
+  .av2-elapsed{ font-size:11.5px; color:rgba(255,255,255,.55); font-variant-numeric:tabular-nums; }
+  .av2-close{
+    width:30px; height:30px; border-radius:9px; border:1px solid rgba(255,255,255,.25);
+    background:rgba(255,255,255,.1); color:#fff; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition:background .15s;
+  }
+  .av2-close:hover{ background:rgba(255,255,255,.2); }
+  .av2-close svg{ width:13px; height:13px; }
+
+  .av2-stepper{ position:relative; z-index:2; display:flex; align-items:flex-start; justify-content:center; }
+  .av2-step{ display:flex; align-items:center; flex:1; max-width:150px; }
+  .av2-step:last-child{ flex:none; max-width:none; }
+  .av2-step-circle{
+    width:36px; height:36px; border-radius:50%; flex:none; position:relative;
+    background:rgba(255,255,255,.12); border:1.5px solid rgba(255,255,255,.25); color:rgba(255,255,255,.65);
+    display:flex; align-items:center; justify-content:center; transition:all .35s ease;
+  }
+  .av2-step-circle svg{ width:15px; height:15px; }
+  .av2-step-label{ font-size:10px; font-weight:600; color:rgba(255,255,255,.45); text-align:center; margin-top:7px; max-width:100px; line-height:1.3; transition:color .3s ease; }
+  .av2-step-col{ display:flex; flex-direction:column; align-items:center; flex:none; }
+  .av2-step.done .av2-step-circle{ background:#fff; border-color:#fff; color:#7c3aed; }
+  .av2-step.done .av2-step-label{ color:rgba(255,255,255,.85); }
+  .av2-step.active .av2-step-circle{
+    background:#fff; border-color:#fff; color:#7c3aed;
+    box-shadow:0 0 0 6px rgba(255,255,255,.16), 0 0 22px 2px rgba(255,255,255,.35);
+  }
+  .av2-step.active .av2-step-label{ color:#fff; }
+  .av2-step-line{ flex:1; height:2px; background:rgba(255,255,255,.22); margin:17px 4px 0; border-radius:2px; overflow:hidden; }
+  .av2-step-line-fill{ height:100%; width:0%; background:#fff; transition:width .6s ease; }
+
+  .av2-content{ flex:1; min-height:0; overflow-y:auto; padding:22px 26px 8px; display:flex; flex-direction:column; gap:18px; }
+
+  .av2-phase{ min-height:44px; }
+  .av2-phase-title{ font-size:16px; font-weight:800; color:var(--text); transition:opacity .18s ease, transform .18s ease; }
+  .av2-phase-sub{ font-size:12.5px; color:var(--text-dim); margin-top:3px; transition:opacity .18s ease, transform .18s ease; }
+  .av2-phase.fading .av2-phase-title, .av2-phase.fading .av2-phase-sub{ opacity:0; transform:translateY(-4px); }
+
+  .av2-checklist{ display:flex; flex-direction:column; gap:11px; }
+  .av2-item{
+    display:flex; align-items:flex-start; gap:10px; font-size:13px; color:var(--text-dim); line-height:1.5;
+    opacity:0; transform:translateY(6px); animation:av2ItemIn .45s cubic-bezier(.16,1,.3,1) forwards;
+  }
+  .av2-check{
+    width:19px; height:19px; border-radius:50%; flex:none; margin-top:1px; position:relative;
+    border:2px solid var(--border); display:flex; align-items:center; justify-content:center; overflow:hidden;
+  }
+  .av2-check-fill{
+    position:absolute; inset:-2px; border-radius:50%; background:linear-gradient(135deg,#6366f1,#a855f7);
+    transform:scale(0); transition:transform .4s cubic-bezier(.34,1.56,.64,1);
+  }
+  .av2-check svg{ position:relative; z-index:1; width:10px; height:10px; color:#fff; opacity:0; transform:scale(.4); transition:opacity .2s ease .18s, transform .25s cubic-bezier(.34,1.56,.64,1) .18s; }
+  .av2-item.checked .av2-check-fill{ transform:scale(1); }
+  .av2-item.checked .av2-check svg{ opacity:1; transform:scale(1); }
+  .av2-item.checked{ color:var(--text); }
+  @keyframes av2ItemIn{ to{ opacity:1; transform:translateY(0); } }
+
+  .av2-coverage{ display:flex; flex-direction:column; gap:8px; }
+  .av2-coverage-label{ font-size:10.5px; font-weight:700; color:var(--text-faint); text-transform:uppercase; letter-spacing:.5px; }
+  .av2-bars{ display:flex; align-items:flex-end; gap:8px; height:76px; }
+  .av2-bar-col{ flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; height:100%; justify-content:flex-end; }
+  .av2-bar{
+    width:100%; max-width:26px; border-radius:6px 6px 3px 3px; background:var(--surface-raised-hover);
+    height:6%; position:relative; overflow:hidden;
+    transition:height .7s cubic-bezier(.34,1.2,.4,1), background .5s ease;
+  }
+  .av2-bar.filled{ background:linear-gradient(180deg,#818cf8,#6366f1); }
+  .av2-bar-notch{
+    position:absolute; left:2px; right:2px; height:2px; background:rgba(255,255,255,.75); border-radius:2px;
+    opacity:0; transition:opacity .3s ease;
+  }
+  .av2-bar-notch.show{ opacity:1; }
+  .av2-bar-day{ font-size:9.5px; font-weight:600; color:var(--text-faint); }
+
+  .av2-progress-row{ display:flex; align-items:center; gap:12px; flex:none; padding:8px 26px 4px; }
+  .av2-progress-track{ flex:1; height:6px; border-radius:5px; background:var(--surface-raised-hover); overflow:hidden; position:relative; }
+  .av2-progress-fill{
+    height:100%; width:0%; border-radius:5px; background:linear-gradient(90deg,#6366f1,#a855f7,#d946ef);
+    transition:width .6s ease; position:relative; overflow:hidden;
+  }
+  .av2-progress-fill::after{
+    content:''; position:absolute; inset:0; background:linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent);
+    width:60px; animation:shimmer 1.4s linear infinite;
+  }
+  .av2-progress-text{ font-size:11px; color:var(--text-faint); font-variant-numeric:tabular-nums; flex:none; }
+
+  .av2-complete{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:4px; padding:6px 0 2px; }
+  .av2-complete-icon{
+    width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,#6366f1,#a855f7);
+    display:flex; align-items:center; justify-content:center; color:#fff; margin-bottom:10px;
+    box-shadow:0 0 0 7px rgba(139,92,246,.15);
+  }
+  .av2-complete-icon svg{ width:24px; height:24px; }
+  .av2-complete-msg{ font-size:14px; font-weight:700; color:var(--text); }
+  .av2-stats{ display:flex; gap:10px; width:100%; margin-top:14px; }
+  .av2-stat-chip{ flex:1; background:var(--surface-raised); border:1px solid var(--border); border-radius:10px; padding:10px 8px; text-align:center; }
+  .av2-stat-chip .asv{ font-size:16px; font-weight:800; color:#7c3aed; }
+  .av2-stat-chip .asl{ font-size:9px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.4px; margin-top:2px; }
+
+  .av2-footer{ flex:none; padding:14px 26px 20px; display:flex; justify-content:flex-end; gap:10px; }
+
+  /* =====================================================================
+     V3 — "Dashboard": a polished, colorful recreation of the reference
+     screenshot. Independent engine/state from V1 and V2.
+     ===================================================================== */
+  .v3-modal{
+    width:1220px; max-width:96vw; height:800px; max-height:94vh;
+    border-radius:20px; overflow:hidden; display:flex; flex-direction:column;
+    background:var(--v3-bg);
+    box-shadow:0 40px 90px -30px rgba(0,0,0,.55);
+    transform:translateY(18px) scale(.98);
+    transition:transform .3s cubic-bezier(.2,.9,.3,1.2);
+  }
+  .overlay.visible .v3-modal{ transform:translateY(0) scale(1); }
+  :root{
+    --v3-bg:#f6f8fc; --v3-card:#ffffff; --v3-border:#e6eaf2; --v3-text:#0f1a45; --v3-dim:#64748b; --v3-faint:#94a3b8;
+    --v3-track:#e5e9f1; --v3-row:#f2f4f8; --v3-row-line:rgba(15,26,69,.06); --v3-skel:#e2e7ef; --v3-btn:#f1f4f8;
+  }
+  [data-theme="dark"] .v3-modal{
+    --v3-bg:#111829; --v3-card:#172035; --v3-border:#26304a; --v3-text:#e7ecff; --v3-dim:#93a0c4; --v3-faint:#5f6c94;
+    --v3-track:#26304a; --v3-row:#1c2640; --v3-row-line:rgba(255,255,255,.05); --v3-skel:#2a3552; --v3-btn:#1f2a44;
+  }
+
+  /* header */
+  .v3-header{
+    display:flex; align-items:center; justify-content:space-between; padding:18px 26px 16px; flex:none;
+    background:var(--v3-card); border-bottom:1px solid var(--v3-border);
+  }
+  .v3-header-left{ display:flex; align-items:center; gap:16px; }
+  .v3-brand{
+    width:52px; height:52px; border-radius:14px; flex:none;
+    background:linear-gradient(135deg,#3b82f6 0%,#6366f1 50%,#8b5cf6 100%);
+    display:flex; align-items:center; justify-content:center; color:#fff;
+    box-shadow:0 8px 18px -8px rgba(99,102,241,.7);
+  }
+  .v3-brand svg{ width:28px; height:28px; stroke-width:1.75; }
+  .v3-title{ font-size:22px; font-weight:800; color:var(--v3-text); letter-spacing:-.3px; line-height:1.2; }
+  .v3-subtitle{ font-size:13.5px; color:var(--v3-dim); margin-top:3px; }
+  .v3-header-right{ display:flex; align-items:center; gap:10px; }
+  .v3-icon-btn{
+    width:40px; height:40px; border-radius:10px; border:1px solid var(--v3-border);
+    background:var(--v3-card); color:var(--v3-text); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition:background .15s;
+  }
+  .v3-icon-btn:hover{ background:var(--v3-btn); }
+  .v3-icon-btn svg{ width:18px; height:18px; stroke-width:1.75; }
+  .v3-icon-btn .icon-sun{ display:none; }
+  [data-theme="dark"] .v3-icon-btn .icon-moon{ display:none; }
+  [data-theme="dark"] .v3-icon-btn .icon-sun{ display:block; }
+
+  /* stepper */
+  .v3-stepper-wrap{ padding:16px 26px 6px; flex:none; position:relative; }
+  .v3-stepper{ display:flex; align-items:flex-start; justify-content:space-between; position:relative; }
+  .v3-stepper::before{
+    content:''; position:absolute; top:17px; left:52px; right:52px; height:2px;
+    background:var(--v3-track); z-index:0;
+  }
+  .v3-stepper .v3-fill{
+    position:absolute; top:17px; left:52px; height:2px; width:0px; z-index:1;
+    background:linear-gradient(90deg,#22c55e 0,#22c55e calc(100% - 150px),#3b82f6 calc(100% - 70px),#6366f1 100%);
+    transition:width .5s ease;
+  }
+  .v3-step{ position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; width:104px; flex:none; }
+  .v3-step-circle{
+    width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:var(--v3-card); border:1.5px solid #cbd5e1; color:var(--v3-faint); position:relative;
+    transition:all .3s ease;
+  }
+  [data-theme="dark"] .v3-step-circle{ border-color:#3a4566; }
+  .v3-step-circle svg{ width:17px; height:17px; stroke-width:2; }
+  .v3-step-label{ font-size:12px; font-weight:500; color:var(--v3-dim); text-align:center; margin-top:8px; line-height:1.35; max-width:100px; }
+  .v3-step-pill{ display:none; }
+  .v3-step.done .v3-step-circle{ background:#22a45a; border-color:#22a45a; color:#fff; }
+  .v3-step.done .v3-step-label{ color:#16a34a; font-weight:600; }
+  [data-theme="dark"] .v3-step.done .v3-step-label{ color:#4ade80; }
+  .v3-step.active .v3-step-circle{
+    background:#2563eb; border-color:#2563eb; color:#fff;
+    box-shadow:0 0 0 5px rgba(59,130,246,.18);
+  }
+  .v3-step.active .v3-step-label{ color:var(--v3-text); font-weight:700; }
+
+  /* KPI cards */
+  .v3-kpi-row{ display:flex; gap:16px; padding:14px 26px 16px; flex:none; }
+  .v3-kpi{
+    flex:1; position:relative; overflow:hidden; border-radius:14px; padding:16px 18px;
+    background:var(--kc-bg); border:1px solid var(--kc-border);
+    display:flex; align-items:center; gap:18px;
+  }
+  .v3-kpi-top{ display:contents; }
+  .v3-kpi-badge{
+    width:52px; height:52px; border-radius:14px; background:var(--kc-tile); color:var(--kc-icon); flex:none;
+    display:flex; align-items:center; justify-content:center; order:0;
+  }
+  .v3-kpi-badge svg{ width:28px; height:28px; stroke-width:1.9; }
+  .v3-kpi-text{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .v3-kpi-label{ font-size:12px; font-weight:600; color:var(--kc-text); text-transform:uppercase; letter-spacing:.2px; white-space:nowrap; }
+  .v3-kpi-value{ font-size:28px; font-weight:800; color:var(--v3-text); font-variant-numeric:tabular-nums; line-height:1; }
+  .v3-kpi-value .u{ font-size:13px; font-weight:500; color:var(--v3-text); opacity:.8; margin-left:6px; }
+  .v3-kpi-chart{ display:none; }
+  .v3-kpi.blue{   --kc-bg:#f1f6fe; --kc-border:#dde8fb; --kc-tile:#e0ebfd; --kc-icon:#2563eb; --kc-text:#475569; }
+  .v3-kpi.purple{ --kc-bg:#f7f3fe; --kc-border:#ebe2fc; --kc-tile:#ece2fd; --kc-icon:#7c3aed; --kc-text:#7c3aed; }
+  .v3-kpi.green{  --kc-bg:#f0faf5; --kc-border:#d8f1e3; --kc-tile:#d9f3e4; --kc-icon:#16a34a; --kc-text:#334155; }
+  .v3-kpi.orange{ --kc-bg:#fff7ef; --kc-border:#fde6cf; --kc-tile:#fde5cc; --kc-icon:#ea7a0c; --kc-text:#ea580c; }
+  [data-theme="dark"] .v3-kpi.blue{   --kc-bg:rgba(59,130,246,.08);  --kc-border:rgba(59,130,246,.2);  --kc-tile:rgba(59,130,246,.18); --kc-icon:#93c5fd; --kc-text:#aab6d6; }
+  [data-theme="dark"] .v3-kpi.purple{ --kc-bg:rgba(139,92,246,.08); --kc-border:rgba(139,92,246,.2); --kc-tile:rgba(139,92,246,.18); --kc-icon:#c4b5fd; --kc-text:#c4b5fd; }
+  [data-theme="dark"] .v3-kpi.green{  --kc-bg:rgba(34,197,94,.08);  --kc-border:rgba(34,197,94,.2);  --kc-tile:rgba(34,197,94,.18);  --kc-icon:#86efac; --kc-text:#aab6d6; }
+  [data-theme="dark"] .v3-kpi.orange{ --kc-bg:rgba(249,115,22,.08); --kc-border:rgba(249,115,22,.2); --kc-tile:rgba(249,115,22,.18); --kc-icon:#fdba74; --kc-text:#fdba74; }
+
+  /* body split */
+  .v3-body{ flex:1; min-height:0; display:flex; gap:16px; padding:0 26px 16px; }
+  .v3-card{
+    background:var(--v3-card); border:1px solid var(--v3-border); border-radius:12px;
+    display:flex; flex-direction:column; min-height:0;
+    box-shadow:0 4px 14px -10px rgba(15,26,69,.18);
+  }
+  .v3-card-head{ display:flex; align-items:center; gap:10px; padding:16px 18px 8px; flex:none; }
+  .v3-card-head svg{ width:22px; height:22px; color:#2563eb; stroke-width:1.9; }
+  .v3-card-title{ font-size:16px; font-weight:700; color:var(--v3-text); }
+  .v3-running-pill{
+    margin-left:auto; display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600;
+    color:#15803d; background:#e3f7ea; padding:6px 12px; border-radius:8px;
+  }
+  [data-theme="dark"] .v3-running-pill{ background:rgba(34,197,94,.16); color:#4ade80; }
+  .v3-running-dot{
+    width:12px; height:12px; border-radius:50%; background:#22a45a; position:relative; flex:none;
+  }
+  .v3-running-dot::after{
+    content:''; position:absolute; left:4.5px; top:3.5px; width:0; height:0;
+    border-left:4px solid #fff; border-top:2.5px solid transparent; border-bottom:2.5px solid transparent;
+  }
+
+  .v3-log-panel{ width:356px; flex:none; }
+  .v3-log-list{ flex:1; overflow-y:auto; padding:4px 18px 12px; display:flex; flex-direction:column; }
+  .v3-log-item{
+    position:relative; display:flex; gap:14px; padding:9px 0;
+    opacity:0; transform:translateY(6px); animation:v3ItemIn .4s cubic-bezier(.16,1,.3,1) forwards;
+  }
+  .v3-log-item:not(:last-child)::before{
+    content:''; position:absolute; left:10.5px; top:34px; bottom:-8px; width:1px; background:var(--v3-border);
+  }
+  .v3-log-icon{
+    width:22px; height:22px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center;
+    color:var(--v3-text); background:transparent; margin-top:0;
+  }
+  .v3-log-icon svg{ width:19px; height:19px; stroke-width:1.8; }
+  .v3-log-icon.good{ background:#22a45a; color:#fff; }
+  .v3-log-icon.good svg{ width:13px; height:13px; stroke-width:3; }
+  .v3-log-icon.head{ color:#2563eb; }
+  .v3-log-icon.warn{ color:#d97706; }
+  .v3-log-icon.info{ color:var(--v3-text); }
+  .v3-log-icon.pending{ color:#2563eb; }
+  .v3-log-icon.pending svg{ animation:v3Spin 2.4s linear infinite; }
+  .v3-log-body{ flex:1; min-width:0; }
+  .v3-log-row1{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .v3-log-text{ font-size:13px; font-weight:500; color:var(--v3-text); line-height:1.45; }
+  .v3-log-item.is-pending .v3-log-text{ color:#2563eb; }
+  [data-theme="dark"] .v3-log-item.is-pending .v3-log-text{ color:#93c5fd; }
+  .v3-log-sub{ font-size:11.5px; color:var(--v3-dim); margin-top:3px; line-height:1.4; }
+  .v3-log-time{ flex:none; font-size:11.5px; color:var(--v3-dim); white-space:nowrap; margin-top:2px; font-variant-numeric:tabular-nums; }
+  @keyframes v3ItemIn{ to{ opacity:1; transform:translateY(0); } }
+  @keyframes v3Spin{ to{ transform:rotate(360deg); } }
+
+  .v3-sched-panel{ flex:1; min-width:0; }
+  .v3-sched-body{ flex:1; min-height:0; padding:10px 18px 12px; overflow:hidden; }
+  .v3-sched-body .ruler{ height:16px; margin:0 0 6px 100px; }
+  .v3-sched-body .ruler span{ font-size:11.5px; color:var(--v3-dim); }
+  .v3-sched-body .row-block{ margin-bottom:3px; }
+  .v3-sched-body .row-block:last-child{ margin-bottom:0; }
+  .v3-sched-body .row-label{ width:100px; padding-right:12px; }
+  .v3-sched-body .row-label-emp{ gap:9px; }
+  .v3-sched-body .grid-row{
+    height:25px; border:none; border-radius:4px;
+    background:repeating-linear-gradient(90deg, var(--v3-row-line) 0, var(--v3-row-line) 1px, transparent 1px, transparent calc(100%/8));
+    background-color:var(--v3-row);
+  }
+  .v3-sched-body .row-avatar{ width:22px; height:22px; font-size:8.5px; font-weight:700; letter-spacing:0; }
+  .v3-sched-body .row-skel{ gap:3px; }
+  .v3-sched-body .row-skel span{ height:5px; background:var(--v3-skel); }
+  .v3-sched-body .row-skel span:first-child{ width:48px; }
+  .v3-sched-body .row-skel span:last-child{ width:34px; }
+  .v3-sched-body .shift-block{ top:2.5px; bottom:2.5px; border-radius:5px; box-shadow:none; }
+  .v3-sched-body .shift-block.swap-glow{ box-shadow:0 0 0 3px rgba(139,92,246,.45); }
+  .v3-sched-body .shift-block.priority-glow{ box-shadow:0 0 0 3px rgba(139,92,246,.5), 0 0 14px 2px rgba(139,92,246,.35); }
+
+  .v3-footer{
+    flex:none; padding:16px 26px; display:flex; align-items:center; gap:36px;
+    background:var(--v3-card); border-top:1px solid var(--v3-border);
+  }
+  .v3-footer-text{ flex:none; width:210px; }
+  .v3-footer-step{ font-size:14px; font-weight:600; color:var(--v3-text); }
+  .v3-footer-sub{ font-size:12px; color:var(--v3-dim); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .v3-progress-track{ flex:1; height:12px; border-radius:99px; background:var(--v3-track); overflow:hidden; position:relative; }
+  .v3-progress-fill{
+    height:100%; width:0%; border-radius:99px; background:linear-gradient(90deg,#3b82f6,#6366f1 60%,#8b5cf6);
+    transition:width .6s ease;
+  }
+  .v3-remaining{ flex:none; font-size:13px; color:var(--v3-dim); font-variant-numeric:tabular-nums; min-width:48px; text-align:right; }
+  .v3-cancel-btn{
+    flex:none; display:inline-flex; align-items:center; gap:6px; border:1px solid var(--v3-border); cursor:pointer;
+    background:var(--v3-btn); color:var(--v3-text); padding:12px 26px; border-radius:10px; font-size:14px; font-weight:700;
+    transition:background .15s, border-color .15s;
+  }
+  .v3-cancel-btn:hover{ border-color:#cbd5e1; }
+  .v3-cancel-btn svg{ display:none; }
+</style>
+</head>
+<body>
+
+  <div class="top-controls">
+    <!-- Settings / version-picker icon — hidden for now (default version is
+         locked to V1). Left in place, commented out, so it can be
+         re-enabled later without rebuilding it.
+    <div class="settings-wrap">
+      <button class="theme-toggle" id="settingsBtn" title="Settings"><i data-lucide="settings"></i></button>
+      <div class="settings-panel" id="settingsPanel">
+        <div class="settings-panel-head">Animation style</div>
+        <div class="settings-version-list" id="settingsVersionList"></div>
+      </div>
+    </div>
+    -->
+    <button class="theme-toggle" id="themeToggleOuter" title="Switch to dark theme">
+      <i data-lucide="moon" class="icon-moon"></i><i data-lucide="sun" class="icon-sun"></i>
+    </button>
+  </div>
+
+  <div class="trigger-card">
+    <h1>Zip Schedule</h1>
+    <p>Click below to let AI Scheduling build next week's schedule — importing standard shifts, filling gaps, assigning employees, swapping for better skill coverage, adding breaks, and cleaning up leftover fragments.</p>
+    <button class="run-btn" id="runBtn"><i data-lucide="sparkles"></i> Run AI Schedule</button>
+  </div>
+  <div id="status-banner"></div>
+
+  <div class="overlay" id="overlay">
+    <div class="modal" id="modal">
+
+      <div class="m-header">
+        <div class="m-header-left">
+          <div class="ai-orb"><i data-lucide="brain"></i></div>
+          <div>
+            <div class="m-title">Running AI Schedule</div>
+            <div class="m-subtitle"><span class="dot"></span><span id="subStageText">Preparing…</span></div>
+          </div>
+        </div>
+        <div class="m-header-right">
+          <button class="theme-toggle" id="themeToggleModal" title="Switch to dark theme">
+            <i data-lucide="moon" class="icon-moon"></i><i data-lucide="sun" class="icon-sun"></i>
+          </button>
+          <button class="m-close" id="closeBtn" title="Cancel"><i data-lucide="x"></i></button>
+        </div>
+      </div>
+
+      <div class="stepper-wrap">
+        <div class="stepper" id="stepper">
+          <div class="fill-line" id="fillLine"></div>
+        </div>
+      </div>
+
+      <div class="kpi-strip">
+        <div class="kpi-tile blue"><span class="kpi-icon"><i data-lucide="clock"></i></span><div class="kpi-label">Forecasted Hours</div><div class="kpi-value"><span id="kpiForecast">0</span><span class="kpi-unit">hrs</span></div></div>
+        <div class="kpi-tile purple"><span class="kpi-icon"><i data-lucide="calendar-clock"></i></span><div class="kpi-label">Scheduled Hours</div><div class="kpi-value"><span id="kpiScheduled">0</span><span class="kpi-unit">hrs</span></div></div>
+        <div class="kpi-tile green"><span class="kpi-icon"><i data-lucide="users-round"></i></span><div class="kpi-label">Employees Assigned</div><div class="kpi-value"><span id="kpiEmployees">0</span></div></div>
+        <div class="kpi-tile orange"><span class="kpi-icon"><i data-lucide="clipboard-list"></i></span><div class="kpi-label">Open Shifts</div><div class="kpi-value"><span id="kpiOpen">0</span></div></div>
+      </div>
+
+      <div class="m-body">
+        <div class="log-panel">
+          <div class="log-panel-head"><i data-lucide="sparkles"></i> <span class="log-panel-head-text">Live Activity</span><span class="live-dot"></span></div>
+          <div class="log-list" id="logList"></div>
+        </div>
+
+        <div class="grid-panel">
+          <div class="grid-card">
+            <div class="ruler" id="ruler"></div>
+            <div id="rowsHost"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="m-footer">
+        <div class="footer-text" id="stepCounter">Step 0 / 9</div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="footer-text" id="elapsedText">0.0s</div>
+        <button class="footer-btn" id="cancelBtn">Cancel</button>
+      </div>
+
+      <div class="complete-layer" id="completeLayer">
+        <div class="complete-card">
+          <div class="complete-check"><i data-lucide="check"></i></div>
+          <h2>AI Schedule Complete</h2>
+          <p>Your schedule was generated, optimized, and validated against labor rules.</p>
+          <div class="complete-stats" id="completeStats"></div>
+          <div class="complete-actions">
+            <button class="footer-btn" id="replayBtn"><i data-lucide="rotate-ccw"></i> Replay</button>
+            <button class="footer-btn primary" id="viewBtn"><i data-lucide="calendar-check"></i> View Schedule</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="overlay" id="overlayV2">
+    <div class="modal-v2b" id="modalV2">
+
+      <div class="av2-banner">
+        <span class="av2-blob av2-blob-1"></span>
+        <span class="av2-blob av2-blob-2"></span>
+        <span class="av2-blob av2-blob-3"></span>
+
+        <div class="av2-banner-head">
+          <div class="av2-banner-title"><i data-lucide="sparkles"></i> AI Scheduling</div>
+          <div class="av2-banner-right">
+            <span class="av2-elapsed" id="v2Elapsed">0.0s</span>
+            <button class="av2-close" id="closeBtnV2" title="Cancel"><i data-lucide="x"></i></button>
+          </div>
+        </div>
+
+        <div class="av2-stepper" id="v2Stepper"></div>
+      </div>
+
+      <div class="av2-content" id="v2Content">
+        <div class="av2-phase" id="v2Phase">
+          <div class="av2-phase-title" id="v2PhaseTitle">Building Shifts</div>
+          <div class="av2-phase-sub" id="v2PhaseSub">Importing standard shifts and filling forecast gaps</div>
+        </div>
+
+        <div class="av2-complete" id="v2Complete" hidden>
+          <div class="av2-complete-icon"><i data-lucide="check"></i></div>
+          <div class="av2-complete-msg">Schedule generated and validated — no compliance issues found.</div>
+          <div class="av2-stats" id="v2Stats"></div>
+        </div>
+
+        <div class="av2-checklist" id="v2Checklist"></div>
+
+        <div class="av2-coverage">
+          <div class="av2-coverage-label">Weekly Coverage</div>
+          <div class="av2-bars" id="v2Bars"></div>
+        </div>
+      </div>
+
+      <div class="av2-progress-row">
+        <div class="av2-progress-track"><div class="av2-progress-fill" id="v2ProgressFill"></div></div>
+        <div class="av2-progress-text" id="v2ProgressText">Phase 1 / 4</div>
+      </div>
+
+      <div class="av2-footer">
+        <button class="footer-btn" id="replayBtnV2" hidden><i data-lucide="rotate-ccw"></i> Replay</button>
+        <button class="footer-btn primary" id="cancelBtnV2">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlayV3">
+    <div class="v3-modal" id="modalV3">
+
+      <div class="v3-header">
+        <div class="v3-header-left">
+          <div class="v3-brand"><i data-lucide="sparkles"></i></div>
+          <div>
+            <div class="v3-title">Running AI Schedule</div>
+            <div class="v3-subtitle" id="v3SubStage">Preparing…</div>
+          </div>
+        </div>
+        <div class="v3-header-right">
+          <button class="v3-icon-btn" id="themeToggleV3" title="Toggle theme">
+            <i data-lucide="moon" class="icon-moon"></i><i data-lucide="sun" class="icon-sun"></i>
+          </button>
+          <button class="v3-icon-btn" id="closeBtnV3" title="Cancel"><i data-lucide="x"></i></button>
+        </div>
+      </div>
+
+      <div class="v3-stepper-wrap">
+        <div class="v3-stepper" id="v3Stepper">
+          <div class="v3-fill" id="v3Fill"></div>
+        </div>
+      </div>
+
+      <div class="v3-kpi-row">
+        <div class="v3-kpi blue">
+          <div class="v3-kpi-badge"><i data-lucide="clock"></i></div>
+          <div class="v3-kpi-text">
+            <div class="v3-kpi-label">Forecasted Hours</div>
+            <div class="v3-kpi-value"><span id="v3KpiForecast">0</span><span class="u">hrs</span></div>
+          </div>
+        </div>
+        <div class="v3-kpi purple">
+          <div class="v3-kpi-badge"><i data-lucide="calendar"></i></div>
+          <div class="v3-kpi-text">
+            <div class="v3-kpi-label">Scheduled Hours</div>
+            <div class="v3-kpi-value"><span id="v3KpiScheduled">0</span><span class="u">hrs</span></div>
+          </div>
+        </div>
+        <div class="v3-kpi green">
+          <div class="v3-kpi-badge"><i data-lucide="users"></i></div>
+          <div class="v3-kpi-text">
+            <div class="v3-kpi-label">Employees Assigned</div>
+            <div class="v3-kpi-value"><span id="v3KpiEmployees">0</span></div>
+          </div>
+        </div>
+        <div class="v3-kpi orange">
+          <div class="v3-kpi-badge"><i data-lucide="armchair"></i></div>
+          <div class="v3-kpi-text">
+            <div class="v3-kpi-label">Open Shifts</div>
+            <div class="v3-kpi-value"><span id="v3KpiOpen">0</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="v3-body">
+        <div class="v3-card v3-log-panel">
+          <div class="v3-card-head">
+            <i data-lucide="activity"></i>
+            <span class="v3-card-title">Live Activity</span>
+            <span class="v3-running-pill" id="v3RunningPill"><span class="v3-running-dot"></span>Running</span>
+          </div>
+          <div class="v3-log-list" id="v3LogList"></div>
+        </div>
+
+        <div class="v3-card v3-sched-panel">
+          <div class="v3-card-head">
+            <i data-lucide="calendar"></i>
+            <span class="v3-card-title">Employee Schedule</span>
+          </div>
+          <div class="v3-sched-body">
+            <div class="ruler" id="v3Ruler"></div>
+            <div id="v3RowsHost"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="v3-footer">
+        <div class="v3-footer-text">
+          <div class="v3-footer-step" id="v3StepCounter">Step 1 of 10</div>
+          <div class="v3-footer-sub" id="v3StepSub">Starting…</div>
+        </div>
+        <div class="v3-progress-track"><div class="v3-progress-fill" id="v3ProgressFill"></div></div>
+        <div class="v3-remaining" id="v3Remaining">40.0s</div>
+        <button class="v3-cancel-btn" id="cancelBtnV3"><i data-lucide="x"></i> Cancel</button>
+      </div>
+
+    </div>
+  </div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ---------------------------------------------------------------------
+  // Data model
+  // ---------------------------------------------------------------------
+  // Rows are employees, not days — each row is one person's timeline
+  const ROWS = [
+    {id:'tray', label:'Unassigned', tray:true},
+    {id:'JD'}, {id:'AS'}, {id:'RT'}, {id:'LB'}, {id:'NV'}, {id:'OW'},
+    {id:'MK'}, {id:'KP'}, {id:'TS'},
+  ];
+  const FORECAST_TOTAL = 34; // hrs, arbitrary target used for the KPI tile
+
+  const TOTAL_IDX = 64; // 15-min indices from 06:00 to 22:00
+
+  // Loading-skeleton placeholder bars shown before the real import runs
+  const SKELETON_DATA = {
+    JD:  [{s:6,  e:22, c:'sk-blue'}],
+    AS:  [{s:8,  e:14, c:'sk-blue'},  {s:28, e:50, c:'sk-ghost'}],
+    RT:  [{s:2,  e:12, c:'sk-orange'},{s:14, e:32, c:'sk-blue'}],
+    LB:  [{s:20, e:44, c:'sk-green'},{s:50, e:56, c:'sk-orange'}],
+    NV:  [{s:2,  e:20, c:'sk-blue'}, {s:22, e:32, c:'sk-green'}],
+    OW:  [{s:10, e:30, c:'sk-ghost'}],
+    tray:[{s:24, e:48, c:'sk-ghost'}],
+  };
+
+  // Each employee row gets one color from this cycle — used for the
+  // avatar circle AND every shift block that belongs to that row.
+  const ROW_COLORS = [
+    {bg:'#8b5cf6', text:'#ffffff'}, // purple
+    {bg:'#3b82f6', text:'#ffffff'}, // blue
+    {bg:'#eab308', text:'#3a2405'}, // yellow
+  ];
+  const rowColorMap = {};
+
+  // ---------------------------------------------------------------------
+  // DOM refs (filled on init)
+  // ---------------------------------------------------------------------
+  const rowsHost   = document.getElementById('rowsHost');
+  const ruler      = document.getElementById('ruler');
+  const logList    = document.getElementById('logList');
+  const stepperEl  = document.getElementById('stepper');
+  const fillLine   = document.getElementById('fillLine');
+  const subStage   = document.getElementById('subStageText');
+  const stepCounter= document.getElementById('stepCounter');
+  const progressFill = document.getElementById('progressFill');
+  const elapsedText= document.getElementById('elapsedText');
+  const kpiForecast= document.getElementById('kpiForecast');
+  const kpiScheduled=document.getElementById('kpiScheduled');
+  const kpiEmployees=document.getElementById('kpiEmployees');
+  const kpiOpen    = document.getElementById('kpiOpen');
+  const overlay    = document.getElementById('overlay');
+  const modal      = document.getElementById('modal');
+  const completeLayer = document.getElementById('completeLayer');
+  const completeStats = document.getElementById('completeStats');
+  const themeToggleOuter = document.getElementById('themeToggleOuter');
+  const themeToggleModal = document.getElementById('themeToggleModal');
+  const settingsBtn   = document.getElementById('settingsBtn');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const overlayV2     = document.getElementById('overlayV2');
+  const modalV2       = document.getElementById('modalV2');
+  const v2Elapsed     = document.getElementById('v2Elapsed');
+  const v2Stepper     = document.getElementById('v2Stepper');
+  const v2Phase       = document.getElementById('v2Phase');
+  const v2PhaseTitle  = document.getElementById('v2PhaseTitle');
+  const v2PhaseSub    = document.getElementById('v2PhaseSub');
+  const v2Checklist   = document.getElementById('v2Checklist');
+  const v2Bars        = document.getElementById('v2Bars');
+  const v2Complete    = document.getElementById('v2Complete');
+  const v2Stats       = document.getElementById('v2Stats');
+  const v2ProgressFill= document.getElementById('v2ProgressFill');
+  const v2ProgressText= document.getElementById('v2ProgressText');
+  const replayBtnV2   = document.getElementById('replayBtnV2');
+
+  const rowEls = {};
+  const blockEls = {};
+  const blocks = {};
+  let cancelled = false;
+  let completed = false;
+  let swapCount = 0;
+  let fragmentMergeCount = 0;
+  let startTime = 0;
+  let elapsedTimer = null;
+  let cancelledV2 = false;
+
+  // ---------------------------------------------------------------------
+  // Small helpers
+  // ---------------------------------------------------------------------
+  function pct(i){ return (i / TOTAL_IDX * 100).toFixed(3) + '%'; }
+  function wait(ms){
+    return new Promise(res=>{
+      const t = setTimeout(res, ms);
+      if(cancelled) { clearTimeout(t); res(); }
+    });
+  }
+  function waitV2(ms){
+    return new Promise(res=>{
+      const t = setTimeout(res, ms);
+      if(cancelledV2) { clearTimeout(t); res(); }
+    });
+  }
+  function fmtTime(idx){
+    const totalMin = 360 + idx*15;
+    let h = Math.floor(totalMin/60);
+    const m = totalMin % 60;
+    const period = h < 12 || h === 24 ? 'AM' : 'PM';
+    let hh = h % 12; if(hh === 0) hh = 12;
+    return hh + (m ? ':' + String(m).padStart(2,'0') : '') + period;
+  }
+
+  function icon(name){ return '<i data-lucide="'+name+'"></i>'; }
+
+  function log(iconName, text, variant){
+    const line = document.createElement('div');
+    line.className = 'log-line' + (variant ? ' variant-'+variant : '');
+    line.innerHTML = '<span class="li-icon">'+icon(iconName)+'</span><span class="li-text">'+text+'</span>';
+    logList.appendChild(line);
+    logList.scrollTop = logList.scrollHeight;
+    if(window.lucide) lucide.createIcons();
+  }
+
+  function animateNumber(el, from, to, suffixIsHrs){
+    const start = performance.now();
+    const dur = 550;
+    function step(now){
+      const t = Math.min(1, (now-start)/dur);
+      const eased = 1 - Math.pow(1-t, 3);
+      const val = from + (to-from)*eased;
+      el.textContent = suffixIsHrs ? val.toFixed(1) : Math.round(val);
+      if(t < 1 && !cancelled) requestAnimationFrame(step);
+      else el.textContent = suffixIsHrs ? to.toFixed(1) : to;
+    }
+    requestAnimationFrame(step);
+  }
+
+  function computeScheduledHours(){
+    let total = 0;
+    ROWS.forEach(r=>{
+      if(r.tray) return;
+      Object.values(blocks).forEach(b=>{
+        if(b.rowId === r.id && (b.status==='standard' || b.status==='assigned' || b.status==='priority')){
+          total += (b.end-b.start)/4;
+        }
+      });
+    });
+    return total;
+  }
+  function computeOpenShifts(){
+    return Object.values(blocks).filter(b=>b.status==='variable' || b.status==='merged').length;
+  }
+  function computeEmployeesAssigned(){
+    return ROWS.filter(r=>!r.tray).filter(r=>
+      Object.values(blocks).some(b=>b.rowId === r.id && (b.status==='standard' || b.status==='assigned' || b.status==='priority'))
+    ).length;
+  }
+
+  function updateKPIs(){
+    animateNumber(kpiScheduled, parseFloat(kpiScheduled.textContent)||0, computeScheduledHours(), true);
+    animateNumber(kpiEmployees, parseInt(kpiEmployees.textContent)||0, computeEmployeesAssigned(), false);
+    animateNumber(kpiOpen, parseInt(kpiOpen.textContent)||0, computeOpenShifts(), false);
+  }
+
+  // ---------------------------------------------------------------------
+  // Grid / block rendering
+  // ---------------------------------------------------------------------
+  function buildStaticDOM(){
+    // ruler
+    ruler.innerHTML = '';
+    for(let h=6; h<=22; h+=2){
+      const idx = (h-6)*4;
+      const s = document.createElement('span');
+      s.style.left = pct(idx);
+      s.textContent = fmtTime(idx).replace(':00','');
+      ruler.appendChild(s);
+    }
+    // rows — one per employee, plus the Unassigned tray
+    rowsHost.innerHTML = '';
+    let empIdx = 0;
+    ROWS.forEach(r=>{
+      const wrap = document.createElement('div');
+      wrap.className = 'row-block';
+      if(r.tray){
+        wrap.innerHTML = '<div class="row-label">Unassigned<small>leftover fragments</small></div>';
+      } else {
+        const c = ROW_COLORS[empIdx % ROW_COLORS.length];
+        rowColorMap[r.id] = c;
+        empIdx++;
+        wrap.innerHTML = '<div class="row-label row-label-emp"><span class="row-avatar" style="background:'+c.bg+';color:'+c.text+'">'+r.id+'</span><span class="row-skel"><span></span><span></span></span></div>';
+      }
+      const grid = document.createElement('div');
+      grid.className = 'grid-row' + (r.tray ? ' tray-row' : '');
+      grid.id = 'grid-' + r.id;
+      wrap.appendChild(grid);
+      rowsHost.appendChild(wrap);
+      rowEls[r.id] = grid;
+    });
+  }
+
+  function buildSkeleton(){
+    Object.keys(SKELETON_DATA).forEach(rowId=>{
+      const row = rowEls[rowId];
+      if(!row) return;
+      SKELETON_DATA[rowId].forEach((b, i)=>{
+        const el = document.createElement('div');
+        el.className = 'skeleton-bar ' + b.c;
+        el.style.left = pct(b.s);
+        el.style.width = pct(b.e - b.s);
+        el.style.animationDelay = (i * 0.15) + 's';
+        row.appendChild(el);
+      });
+    });
+  }
+
+  function clearSkeleton(){
+    document.querySelectorAll('.skeleton-bar').forEach(el=>{
+      el.style.animation = 'none';
+      el.style.transition = 'opacity .4s ease, transform .4s ease';
+      requestAnimationFrame(()=>{
+        el.style.opacity = '0';
+        el.style.transform = 'scale(.9)';
+      });
+      setTimeout(()=>el.remove(), 450);
+    });
+  }
+
+  function blockInner(def){
+    // identity comes from the row itself, so blocks are plain color bars —
+    // only a break icon, and (for the merged fragment) a short label
+    const label = def.customLabel ? '<span class="block-time">'+def.customLabel+'</span>' : '';
+    return label + '<span class="break-marker" id="brk-'+def.id+'">'+icon('coffee')+'</span>';
+  }
+
+  function classNameFor(def){
+    let c = 'shift-block status-' + def.status;
+    if(def.priority) c += ' priority-glow';
+    return c;
+  }
+
+  // Standard/assigned/priority blocks take their color from the row (employee)
+  // they belong to; open/unassigned shifts in the tray keep their amber look.
+  function applyRowColor(el, def){
+    const owned = def.status === 'standard' || def.status === 'assigned' || def.status === 'priority';
+    const c = owned ? rowColorMap[def.rowId] : null;
+    if(c){ el.style.background = c.bg; el.style.color = c.text; }
+    else { el.style.background = ''; el.style.color = ''; }
+  }
+
+  function addBlock(rowId, def, opts){
+    opts = opts || {};
+    const row = rowEls[rowId];
+    const el = document.createElement('div');
+    def.rowId = rowId;
+    el.className = classNameFor(def);
+    el.id = 'blk-' + def.id;
+    el.style.left = pct(def.start);
+    el.style.width = pct(def.end - def.start);
+    el.innerHTML = blockInner(def);
+    applyRowColor(el, def);
+    if(opts.animate !== false){ el.style.opacity = '0'; el.style.transform = 'scale(.85)'; }
+    row.appendChild(el);
+    if(window.lucide) lucide.createIcons();
+    blocks[def.id] = def;
+    blockEls[def.id] = el;
+    if(opts.animate !== false){
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        el.style.opacity = '1'; el.style.transform = 'scale(1)';
+      }));
+    }
+    updateKPIs();
+    return el;
+  }
+
+  function updateBlock(id, patch){
+    const def = blocks[id];
+    if(!def) return;
+    Object.assign(def, patch);
+    const el = blockEls[id];
+    if(!el) return;
+    if(patch.start !== undefined) el.style.left = pct(def.start);
+    if(patch.end !== undefined) el.style.width = pct(def.end - def.start);
+    if(patch.status !== undefined || patch.priority !== undefined){
+      el.className = classNameFor(def);
+      applyRowColor(el, def);
+    }
+    if(patch.customLabel !== undefined || patch.end !== undefined || patch.start !== undefined){
+      const hadBreak = el.querySelector('.break-marker.show');
+      el.innerHTML = blockInner(def);
+      if(window.lucide) lucide.createIcons();
+      if(hadBreak) el.querySelector('.break-marker').classList.add('show');
+    }
+    updateKPIs();
+  }
+
+  function flash(id){
+    // called as flash('blk-'+rawId) everywhere — look up by the DOM id
+    // attribute, not the blockEls dictionary (which is keyed by rawId)
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.classList.add('flash');
+    setTimeout(()=>el.classList.remove('flash'), 1000);
+  }
+
+  function removeBlock(id){
+    const el = blockEls[id];
+    if(!el) return;
+    el.style.opacity = '0';
+    el.style.transform = 'scale(.8)';
+    setTimeout(()=>{
+      el.remove();
+      delete blockEls[id];
+      delete blocks[id];
+      updateKPIs();
+    }, 460);
+  }
+
+  function addBreak(id){
+    // called as addBreak('blk-'+rawId) everywhere — same fix as flash() above
+    const el = document.getElementById(id);
+    if(!el) return;
+    const marker = el.querySelector('.break-marker');
+    if(marker) marker.classList.add('show');
+  }
+
+  // Moves an existing block into a different employee's row — used when a
+  // shift is assigned, EPW-prioritized, or swapped between two people.
+  // An optional `patch` (e.g. {status:'assigned'}) is applied at the same
+  // moment as the row change, so status/color/className never go out of
+  // sync mid-transition.
+  function moveBlockToRow(id, newRowId, patch){
+    const def = blocks[id];
+    const el = blockEls[id];
+    if(!def || !el || !rowEls[newRowId]) return;
+    el.style.opacity = '.2';
+    el.style.transform = 'scale(.9)';
+    setTimeout(()=>{
+      if(patch){
+        Object.assign(def, patch);
+        el.className = classNameFor(def); // safe here: no transient classes (swap-glow, flash) are active during an assign/EPW move
+      }
+      def.rowId = newRowId;
+      rowEls[newRowId].appendChild(el);
+      applyRowColor(el, def);
+      el.style.opacity = '1';
+      el.style.transform = 'scale(1)';
+      updateKPIs();
+    }, 280);
+  }
+
+  // A floating icon badge that pops between two rows (or twice on the same
+  // row) to call out what the algorithm is doing right now — swapping,
+  // combining, assigning, trimming, prioritizing… Reused across stages so
+  // every "working" moment is visibly announced on the schedule pad.
+  function showActionIndicator(rowIdA, rowIdB, atIdx, iconName, color, glow){
+    const container = rowsHost;
+    const rowA = rowEls[rowIdA];
+    const rowB = rowEls[rowIdB] || rowA;
+    if(!rowA) return;
+    const hostRect = container.getBoundingClientRect();
+    const aRect = rowA.getBoundingClientRect();
+    const bRect = rowB.getBoundingClientRect();
+    // shifted up from the row's true center so the badge floats clearly
+    // above the shift bars instead of sitting on top of / behind them
+    const top = ((aRect.top + bRect.top)/2 + aRect.height/2) - hostRect.top - 18;
+    const left = (atIdx/TOTAL_IDX) * aRect.width;
+    const span = document.createElement('div');
+    span.className = 'swap-indicator';
+    if(color) span.style.setProperty('--ind-color', color);
+    if(glow) span.style.setProperty('--ind-glow', glow);
+    span.innerHTML = icon(iconName || 'arrow-left-right');
+    span.style.top = top + 'px';
+    span.style.left = left + 'px';
+    container.style.position = 'relative';
+    container.appendChild(span);
+    if(window.lucide) lucide.createIcons();
+    requestAnimationFrame(()=>span.classList.add('show'));
+    setTimeout(()=>span.remove(), 1400);
+  }
+
+  // ---------------------------------------------------------------------
+  // Stepper
+  // ---------------------------------------------------------------------
+  const STAGES = [
+    {icon:'calendar-days',   title:'Check Scheduling Sequence', sub:'Reading day order configuration'},
+    {icon:'download',       title:'Import Standard Shifts',    sub:'Loading recurring shifts into the week'},
+    {icon:'puzzle',         title:'Create & Combine Shifts',   sub:'Filling forecast gaps, merging open shifts'},
+    {icon:'users',          title:'Assign Employees',          sub:'Matching best-fit employees to open shifts'},
+    {icon:'scissors',       title:'Reduce Overage',            sub:'Trimming shifts that exceed forecast'},
+    {icon:'shuffle',        title:'Optimize (Swap)',           sub:'Swapping shifts for better skill coverage'},
+    {icon:'coffee',         title:'Assign Breaks',             sub:'Placing meal & rest breaks by index'},
+    {icon:'star',           title:'Employee Prioritization',   sub:'Rewarding high-availability employees'},
+    {icon:'layers',         title:'Optimize Fragments',        sub:'Consolidating leftover unassigned pieces'},
+    {icon:'check-circle-2', title:'Finalize',                  sub:'Validating against labor law rules'},
+  ];
+
+  function buildStepper(){
+    stepperEl.querySelectorAll('.step').forEach(n=>n.remove());
+    STAGES.forEach((s, i)=>{
+      const el = document.createElement('div');
+      el.className = 'step';
+      el.id = 'step-'+i;
+      el.innerHTML = '<div class="circle">'+icon(s.icon)+'</div><div class="label">'+s.title+'</div>';
+      stepperEl.appendChild(el);
+    });
+    if(window.lucide) lucide.createIcons();
+  }
+
+  function setStage(i){
+    STAGES.forEach((s,idx)=>{
+      const el = document.getElementById('step-'+idx);
+      el.classList.remove('active','done');
+      if(idx < i) el.classList.add('done');
+      else if(idx === i) el.classList.add('active');
+    });
+    const pctFill = (i/(STAGES.length-1))*100;
+    fillLine.style.width = 'calc((100% - 80px) * ' + (pctFill / 100) + ')';
+    progressFill.style.width = ((i)/(STAGES.length))*100 + '%';
+    stepCounter.textContent = 'Step ' + (i+1) + ' / ' + STAGES.length;
+    subStage.textContent = STAGES[i].title + ' — ' + STAGES[i].sub;
+  }
+
+  // ---------------------------------------------------------------------
+  // Stage scripts
+  // ---------------------------------------------------------------------
+  async function stage0_sequence(){
+    log('calendar-days', 'Reading Scheduling Day Sequence from configuration…', 'head');
+    await wait(600);
+    log('info', 'No custom sequence defined — scheduling from the start of the week.');
+    await wait(400);
+    log('check-circle-2', 'Day order set: Mon → Tue → Wed → Thu → Fri', 'good');
+    await wait(500);
+  }
+
+  async function stage1_import(){
+    log('download', 'Importing standard shifts into the selected week…', 'head');
+    await wait(400);
+    clearSkeleton();
+    addBlock('JD', {id:'JD-A', start:8,  end:24, status:'standard'});
+    addBlock('AS', {id:'AS-A', start:8,  end:24, status:'standard'});
+    log('file-text', '2 standard shifts imported for the morning');
+    await wait(500);
+    addBlock('RT', {id:'RT-A', start:8,  end:20, status:'standard'});
+    addBlock('LB', {id:'LB-A', start:8,  end:24, status:'standard'});
+    log('file-text', '2 more standard shifts imported');
+    await wait(500);
+    addBlock('JD', {id:'JD-B', start:28, end:52, status:'standard'});
+    addBlock('AS', {id:'AS-B', start:28, end:48, status:'standard'});
+    log('file-text', 'Afternoon standard shifts imported');
+    await wait(500);
+    addBlock('NV', {id:'NV-A', start:16, end:44, status:'standard'});
+    log('file-text', '1 standard shift imported');
+    await wait(500);
+    addBlock('OW', {id:'OW-A', start:32, end:44, status:'standard'});
+    log('file-text', '1 standard shift imported');
+    await wait(600);
+    log('alert-triangle', 'One shift exceeds forecasted hours — will be reduced later.', 'warn');
+    log('info', 'Several days remain under forecast — continuing.');
+    await wait(500);
+  }
+
+  async function stage2_createCombine(){
+    log('puzzle', 'Calculating Need = Projected Staff − Scheduled Staff per day…', 'head');
+    await wait(500);
+    addBlock('tray', {id:'gap-mk', start:14, end:22, status:'variable'});
+    log('plus-circle', '2h gap detected → creating a variable shift');
+    await wait(550);
+    addBlock('tray', {id:'gap-kp-a', start:36, end:40, status:'variable'});
+    addBlock('tray', {id:'gap-kp-b', start:40, end:44, status:'variable'});
+    log('plus-circle', '2 adjacent variable shifts created');
+    await wait(650);
+    addBlock('tray', {id:'gap-ts', start:48, end:52, status:'variable'});
+    log('plus-circle', '1h leftover fragment — below minimum shift length');
+    await wait(650);
+    addBlock('tray', {id:'frag-a', start:4,  end:10, status:'variable'});
+    addBlock('tray', {id:'frag-b', start:26, end:32, status:'variable'});
+    log('archive', '2 residual fragments queued to the Unassigned pool');
+    await wait(600);
+    log('puzzle', 'Combining open shifts within the configured continuity window…', 'head');
+    await wait(500);
+    blockEls['gap-kp-a'].classList.add('swap-glow');
+    blockEls['gap-kp-b'].classList.add('swap-glow');
+    showActionIndicator('tray', 'tray', 40, 'link-2', '#3b82f6', 'rgba(59,130,246,.5)');
+    await wait(700);
+    updateBlock('gap-kp-a', {end:44});
+    await wait(180);
+    removeBlock('gap-kp-b');
+    blockEls['gap-kp-a'].classList.remove('swap-glow');
+    log('link-2', 'Merged 2 open shifts into a single 2h shift', 'good');
+    await wait(500);
+    log('info', 'One open shift not combined — no adjacent shift in range.');
+    await wait(500);
+  }
+
+  async function stage3_assign(){
+    log('users', 'Ranking employees by availability, skill level & pay rate…', 'head');
+    await wait(550);
+    showActionIndicator('tray', 'MK', 18, 'user-check', '#22c55e', 'rgba(34,197,94,.5)');
+    await wait(650);
+    moveBlockToRow('gap-mk', 'MK', {status:'assigned'});
+    flash('blk-gap-mk');
+    log('check-circle-2', 'Open shift → assigned to <b>MK</b> (lowest availability overlap)', 'good');
+    await wait(700);
+    showActionIndicator('tray', 'KP', 40, 'user-check', '#22c55e', 'rgba(34,197,94,.5)');
+    await wait(650);
+    moveBlockToRow('gap-kp-a', 'KP', {status:'assigned'});
+    flash('blk-gap-kp-a');
+    log('check-circle-2', 'Open shift → assigned to <b>KP</b> (best skill on job code)', 'good');
+    await wait(700);
+    log('info', 'Standard-shift employees retained: JD, AS, RT, LB, NV, OW');
+    await wait(500);
+  }
+
+  async function stage4_overage(){
+    log('scissors', 'Checking scheduled hours against forecast for violations…', 'head');
+    await wait(600);
+    log('alert-triangle', 'JD’s shift exceeds forecast by 1h', 'warn');
+    await wait(500);
+    flash('blk-JD-B');
+    showActionIndicator('JD', 'tray', 48, 'scissors', '#ef4444', 'rgba(239,68,68,.5)');
+    await wait(650);
+    updateBlock('JD-B', {end:48});
+    await wait(200);
+    addBlock('tray', {id:'frag-c', start:36, end:40, status:'variable'});
+    log('minus-circle', 'Trimmed 1h from the shift boundary → moved to Unassigned (no split shift created)', 'good');
+    await wait(600);
+    log('info', 'Breaks on the trimmed shift will be re-applied in the Assign Breaks step.');
+    await wait(500);
+  }
+
+  async function stage5_swap(){
+    log('shuffle', 'Evaluating shift swaps to improve skill coverage…', 'head');
+    await wait(600);
+    log('search', 'NV overlaps OW for 3h — checking eligibility…');
+    await wait(700);
+    blockEls['NV-A'].classList.add('swap-glow');
+    blockEls['OW-A'].classList.add('swap-glow');
+    log('bar-chart-2', 'Net Gain while swapping = +2 → swap approved', 'good');
+    await wait(400);
+    showActionIndicator('NV', 'OW', 38, 'arrow-left-right', '#8b5cf6', 'rgba(139,92,246,.5)');
+    await wait(750);
+    moveBlockToRow('NV-A', 'OW');
+    moveBlockToRow('OW-A', 'NV');
+    swapCount++;
+    await wait(500);
+    blockEls['NV-A'].classList.remove('swap-glow');
+    blockEls['OW-A'].classList.remove('swap-glow');
+    log('check-circle-2', 'Swapped NV ⇄ OW — best skill level now covers the overlap', 'good');
+    await wait(500);
+  }
+
+  async function stage6_breaks(){
+    log('coffee', 'Calculating minimum / maximum / ideal break index for each shift…', 'head');
+    await wait(500);
+    log('info', 'Only shifts long enough to require one get a break — not every shift.');
+    await wait(400);
+    // Not every shift qualifies for a break — only these cross the
+    // configured shift-length threshold, so only they get the marker.
+    const order = [
+      ['JD-A','Meal break placed at 10:00'],
+      ['RT-A','Rest break placed at 09:30'],
+      ['AS-B','Meal break placed at 16:15'],
+    ];
+    for(const [id, note] of order){
+      flash('blk-'+id);
+      addBreak('blk-'+id);
+      log('coffee', note);
+      await wait(320);
+    }
+    log('check-circle-2', order.length + ' breaks placed on the qualifying shifts', 'good');
+    await wait(500);
+  }
+
+  async function stage7_epw(){
+    log('star', 'Building Gain-Shift and Lose-Shift employee lists…', 'head');
+    await wait(600);
+    log('search', '1h fragment remains open — evaluating priority candidates…');
+    await wait(700);
+    showActionIndicator('tray', 'TS', 50, 'star', '#8b5cf6', 'rgba(139,92,246,.5)');
+    await wait(650);
+    moveBlockToRow('gap-ts', 'TS', {status:'priority', priority:true});
+    addBreak('blk-gap-ts');
+    flash('blk-gap-ts');
+    log('check-circle-2', '<b>TS</b> selected via Employee Prioritization — high availability & skill', 'good');
+    await wait(600);
+  }
+
+  async function stage8_fragments(){
+    log('layers', 'Scanning the Unassigned pool for combinable fragments…', 'head');
+    await wait(600);
+    log('search', '3 fragments found under 2h, all within the 8h continuity window.');
+    await wait(600);
+    showActionIndicator('tray', 'tray', 12, 'link-2', '#3b82f6', 'rgba(59,130,246,.5)');
+    await wait(650);
+    updateBlock('frag-c', {start:10, end:14});
+    await wait(600);
+    updateBlock('frag-a', {end:14});
+    await wait(160);
+    removeBlock('frag-c');
+    await wait(500);
+    showActionIndicator('tray', 'tray', 17, 'link-2', '#3b82f6', 'rgba(59,130,246,.5)');
+    await wait(650);
+    updateBlock('frag-b', {start:14, end:20});
+    await wait(600);
+    updateBlock('frag-a', {end:20, customLabel:'Merged Fragment (4h)'});
+    await wait(160);
+    removeBlock('frag-b');
+    fragmentMergeCount = 3;
+    log('check-circle-2', 'Combined 3 unassigned fragments into a single 4h block for manager review', 'good');
+    await wait(600);
+  }
+
+  async function stage9_finalize(){
+    log('check-circle-2', 'Validating the generated schedule against labor law rules…', 'head');
+    await wait(700);
+    log('check-circle-2', 'No compliance violations found.', 'good');
+    await wait(500);
+    log('party-popper', 'AI Schedule complete.', 'good');
+    await wait(400);
+  }
+
+  const STAGE_FUNCS = [
+    stage0_sequence, stage1_import, stage2_createCombine, stage3_assign,
+    stage4_overage, stage5_swap, stage6_breaks, stage7_epw,
+    stage8_fragments, stage9_finalize
+  ];
+
+  // ---------------------------------------------------------------------
+  // Runner
+  // ---------------------------------------------------------------------
+  async function runAll(){
+    for(let i=0; i<STAGE_FUNCS.length; i++){
+      if(cancelled) return;
+      setStage(i);
+      await STAGE_FUNCS[i]();
+      if(cancelled) return;
+      await wait(250);
+    }
+    if(cancelled) return;
+    onComplete();
+  }
+
+  function onComplete(){
+    completed = true;
+    clearInterval(elapsedTimer);
+    document.getElementById('cancelBtn').textContent = 'Close';
+
+    const scheduled = computeScheduledHours();
+    const employees = computeEmployeesAssigned();
+    const breaksCount = document.querySelectorAll('.break-marker.show').length;
+    const openShifts = computeOpenShifts();
+
+    completeStats.innerHTML = [
+      ['Scheduled Hours', scheduled.toFixed(1)+'h', 'blue',   'calendar-clock'],
+      ['Employees Used',  employees,                'green',  'users-round'],
+      ['Breaks Assigned', breaksCount,               'purple', 'coffee'],
+      ['Shifts Swapped',  swapCount,                 'teal',   'shuffle'],
+      ['Fragments Merged',fragmentMergeCount,        'indigo', 'layers'],
+      ['Open Shifts Left',openShifts,                'orange', 'clipboard-list'],
+    ].map(([label,val,color,iconName])=>
+      '<div class="cstat '+color+(color==='orange'?' warn':'')+'">'
+      + '<span class="cstat-icon">'+icon(iconName)+'</span>'
+      + '<div class="cv">'+val+'</div><div class="cl">'+label+'</div></div>'
+    ).join('');
+    if(window.lucide) lucide.createIcons();
+
+    completeLayer.classList.add('show');
+    launchConfetti();
+  }
+
+  function launchConfetti(){
+    const colors = ['#3b82f6','#8b5cf6','#22c55e','#f59e0b','#ec4899'];
+    for(let i=0;i<28;i++){
+      const c = document.createElement('div');
+      c.className = 'confetti';
+      c.style.left = (Math.random()*100)+'%';
+      c.style.width = c.style.height = (5+Math.random()*5)+'px';
+      c.style.background = colors[i % colors.length];
+      c.style.animation = 'confettiFall ' + (1.1+Math.random()*1.1) + 's ease-in forwards';
+      c.style.animationDelay = (Math.random()*0.4)+'s';
+      modal.appendChild(c);
+      setTimeout(()=>c.remove(), 2600);
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Reset + open/close
+  // ---------------------------------------------------------------------
+  function resetState(){
+    cancelled = false;
+    completed = false;
+    swapCount = 0;
+    fragmentMergeCount = 0;
+    Object.keys(blockEls).forEach(id=>{ blockEls[id].remove(); });
+    Object.keys(blocks).forEach(k=>delete blocks[k]);
+    Object.keys(blockEls).forEach(k=>delete blockEls[k]);
+    logList.innerHTML = '';
+    completeLayer.classList.remove('show');
+    document.getElementById('cancelBtn').textContent = 'Cancel';
+    kpiScheduled.textContent = '0';
+    kpiEmployees.textContent = '0';
+    kpiOpen.textContent = '0';
+    kpiForecast.textContent = FORECAST_TOTAL;
+    buildStaticDOM();
+    buildSkeleton();
+    buildStepper();
+    setStage(0);
+    startTime = performance.now();
+    elapsedTimer = setInterval(()=>{
+      elapsedText.textContent = ((performance.now()-startTime)/1000).toFixed(1) + 's';
+    }, 100);
+  }
+
+  function openModal(){
+    overlay.classList.add('open');
+    requestAnimationFrame(()=>overlay.classList.add('visible'));
+    resetState();
+    runAll();
+  }
+
+  function closeModal(silent){
+    if(!completed && !silent){
+      const ok = confirm('AI Schedule is still running. Cancel and close?');
+      if(!ok) return;
+      cancelled = true;
+    }
+    clearInterval(elapsedTimer);
+    overlay.classList.remove('visible');
+    setTimeout(()=>overlay.classList.remove('open'), 250);
+    if(completed){
+      showBanner();
+    }
+  }
+
+  function showBanner(){
+    const b = document.getElementById('status-banner');
+    b.innerHTML = '<span class="li-icon" style="color:var(--green)">'+icon('check-circle-2')+'</span><span>AI Schedule completed — open shifts, swaps, and breaks were applied. Click <b>Run AI Schedule</b> to watch it again.</span>';
+    b.classList.add('show');
+    if(window.lucide) lucide.createIcons();
+  }
+
+  // ---------------------------------------------------------------------
+  // Theme (light by default; user choice remembered per-browser)
+  // ---------------------------------------------------------------------
+  function getStoredTheme(){
+    try{ return localStorage.getItem('aiSchedulingTheme'); }catch(e){ return null; }
+  }
+  function storeTheme(t){
+    try{ localStorage.setItem('aiSchedulingTheme', t); }catch(e){}
+  }
+  function applyTheme(theme){
+    document.documentElement.setAttribute('data-theme', theme);
+    const label = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+    [themeToggleOuter, themeToggleModal].forEach(btn=>{
+      if(!btn) return;
+      btn.title = label;
+    });
+    storeTheme(theme);
+  }
+  function toggleTheme(){
+    const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+  }
+
+  // ---------------------------------------------------------------------
+  // V2 — "Aurora": four doc-derived phases, each revealing a checklist
+  // and growing a weekly coverage chart
+  // ---------------------------------------------------------------------
+  const PHASES_V2 = [
+    {
+      icon:'layout-grid', title:'Building Shifts',
+      sub:'Importing standard shifts and filling forecast gaps',
+      lines:[
+        'Reading the Scheduling Day Sequence',
+        'Importing standard shifts into the week',
+        'Creating variable shifts for uncovered hours',
+        'Combining open shifts within the continuity window',
+      ]
+    },
+    {
+      icon:'users-round', title:'Assigning Employees',
+      sub:'Matching skill, availability, and pay rate to every open shift',
+      lines:[
+        'Eliminating employees with labor law violations or OT risk',
+        'Ranking by availability, skill level, and pay rate',
+        'Trimming shifts that exceed the forecasted hours',
+        'Swapping shifts to improve overall skill coverage',
+      ]
+    },
+    {
+      icon:'coffee', title:'Adding Breaks & Priority',
+      sub:'Placing compliant breaks and rewarding top employees',
+      lines:[
+        'Calculating ideal break placement per shift',
+        'Assigning meal and rest breaks',
+        'Running the Employee Prioritization Wrapper',
+        'Consolidating leftover unassigned fragments',
+      ]
+    },
+    {
+      icon:'shield-check', title:'Validating Schedule',
+      sub:'Checking the finished schedule against labor law rules',
+      lines:[
+        'Validating the schedule against labor law rules',
+        'No compliance violations found',
+      ]
+    },
+  ];
+
+  const DAY_LABELS_V2 = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+  const BAR_STATES_V2 = [
+    [ {h:55},{h:40},{h:60},{h:35},{h:70},{h:50},{h:20} ],
+    [ {h:55,filled:1},{h:40,filled:1},{h:54,filled:1},{h:35,filled:1},{h:70,filled:1},{h:50,filled:1},{h:20,filled:1} ],
+    [ {h:55,filled:1,notch:1},{h:40,filled:1,notch:1},{h:54,filled:1,notch:1},{h:35,filled:1,notch:1},{h:70,filled:1,notch:1},{h:50,filled:1,notch:1},{h:48,filled:1,notch:1} ],
+    [ {h:59,filled:1,notch:1},{h:44,filled:1,notch:1},{h:58,filled:1,notch:1},{h:39,filled:1,notch:1},{h:74,filled:1,notch:1},{h:54,filled:1,notch:1},{h:52,filled:1,notch:1} ],
+  ];
+
+  // ---------------------------------------------------------------------
+  // V2 — rendering
+  // ---------------------------------------------------------------------
+  function buildV2Stepper(){
+    v2Stepper.innerHTML = '';
+    PHASES_V2.forEach((p, i)=>{
+      const step = document.createElement('div');
+      step.className = 'av2-step';
+      step.id = 'av2step-' + i;
+      step.innerHTML = '<div class="av2-step-col"><div class="av2-step-circle">' + icon(p.icon) + '</div><div class="av2-step-label">' + p.title + '</div></div>'
+        + (i < PHASES_V2.length - 1 ? '<div class="av2-step-line"><div class="av2-step-line-fill" id="av2line-' + i + '"></div></div>' : '');
+      v2Stepper.appendChild(step);
+    });
+    if(window.lucide) lucide.createIcons();
+  }
+
+  function setV2Stage(i){
+    PHASES_V2.forEach((p, idx)=>{
+      const el = document.getElementById('av2step-' + idx);
+      el.classList.remove('active', 'done');
+      if(idx < i) el.classList.add('done');
+      else if(idx === i) el.classList.add('active');
+      if(idx < PHASES_V2.length - 1){
+        document.getElementById('av2line-' + idx).style.width = (idx < i ? '100%' : '0%');
+      }
+    });
+    v2ProgressText.textContent = i >= PHASES_V2.length ? 'Complete' : ('Phase ' + (i + 1) + ' / ' + PHASES_V2.length);
+    v2ProgressFill.style.width = (Math.min(i, PHASES_V2.length) / PHASES_V2.length * 100) + '%';
+  }
+
+  function buildV2Bars(){
+    v2Bars.innerHTML = DAY_LABELS_V2.map((d, i)=>
+      '<div class="av2-bar-col"><div class="av2-bar" id="av2bar-' + i + '" style="height:8%"><span class="av2-bar-notch" id="av2notch-' + i + '"></span></div><div class="av2-bar-day">' + d + '</div></div>'
+    ).join('');
+  }
+
+  function applyBarStateV2(stateIndex){
+    BAR_STATES_V2[stateIndex].forEach((b, i)=>{
+      const bar = document.getElementById('av2bar-' + i);
+      const notch = document.getElementById('av2notch-' + i);
+      bar.style.height = b.h + '%';
+      bar.classList.toggle('filled', !!b.filled);
+      notch.classList.toggle('show', !!b.notch);
+      if(b.notch) notch.style.bottom = Math.max(8, b.h * 0.55) + '%';
+    });
+  }
+
+  async function setPhaseTextV2(phase){
+    v2Phase.classList.add('fading');
+    await waitV2(180);
+    if(cancelledV2) return;
+    v2PhaseTitle.textContent = phase.title;
+    v2PhaseSub.textContent = phase.sub;
+    v2Phase.classList.remove('fading');
+    await waitV2(180);
+  }
+
+  async function runChecklistV2(lines){
+    v2Checklist.innerHTML = '';
+    for(let i = 0; i < lines.length; i++){
+      if(cancelledV2) return;
+      const item = document.createElement('div');
+      item.className = 'av2-item';
+      item.innerHTML = '<span class="av2-check"><span class="av2-check-fill"></span>' + icon('check') + '</span><span>' + lines[i] + '</span>';
+      v2Checklist.appendChild(item);
+      if(window.lucide) lucide.createIcons();
+      await waitV2(80);
+      if(cancelledV2) return;
+      item.classList.add('checked');
+      await waitV2(260);
+    }
+  }
+
+  async function runPhaseV2(i){
+    setV2Stage(i);
+    await setPhaseTextV2(PHASES_V2[i]);
+    if(cancelledV2) return;
+    await runChecklistV2(PHASES_V2[i].lines);
+    if(cancelledV2) return;
+    await waitV2(250);
+    applyBarStateV2(i);
+    await waitV2(550);
+  }
+
+  async function runAllV2(){
+    for(let i = 0; i < PHASES_V2.length; i++){
+      if(cancelledV2) return;
+      await runPhaseV2(i);
+      if(cancelledV2) return;
+    }
+    if(cancelledV2) return;
+    onCompleteV2();
+  }
+
+  let v2StartTime = 0;
+  let v2ElapsedTimer = null;
+
+  function onCompleteV2(){
+    setV2Stage(PHASES_V2.length);
+    v2Phase.hidden = true;
+    v2Checklist.style.display = 'none';
+    v2Complete.hidden = false;
+    const runtime = ((performance.now() - v2StartTime) / 1000).toFixed(1);
+    const stats = [
+      [PHASES_V2.length + ' / ' + PHASES_V2.length, 'Phases complete'],
+      ['0', 'Compliance issues'],
+      [runtime + 's', 'Total runtime'],
+    ];
+    v2Stats.innerHTML = stats.map(([v, l])=>'<div class="av2-stat-chip"><div class="asv">' + v + '</div><div class="asl">' + l + '</div></div>').join('');
+    document.getElementById('cancelBtnV2').textContent = 'Close';
+    replayBtnV2.hidden = false;
+  }
+
+  function resetV2(){
+    cancelledV2 = false;
+    v2Phase.hidden = false;
+    v2Checklist.style.display = '';
+    v2Complete.hidden = true;
+    v2Checklist.innerHTML = '';
+    replayBtnV2.hidden = true;
+    buildV2Stepper();
+    buildV2Bars();
+    setV2Stage(0);
+    v2PhaseTitle.textContent = PHASES_V2[0].title;
+    v2PhaseSub.textContent = PHASES_V2[0].sub;
+    document.getElementById('cancelBtnV2').textContent = 'Cancel';
+    v2StartTime = performance.now();
+    clearInterval(v2ElapsedTimer);
+    v2ElapsedTimer = setInterval(()=>{
+      v2Elapsed.textContent = ((performance.now() - v2StartTime) / 1000).toFixed(1) + 's';
+    }, 100);
+  }
+
+  function openModalV2(){
+    overlayV2.classList.add('open');
+    requestAnimationFrame(()=>overlayV2.classList.add('visible'));
+    resetV2();
+    runAllV2();
+  }
+
+  function closeModalV2(silent){
+    const isComplete = document.getElementById('cancelBtnV2').textContent === 'Close';
+    if(!isComplete && !silent){
+      const ok = confirm('AI Schedule is still running. Cancel and close?');
+      if(!ok) return;
+      cancelledV2 = true;
+    }
+    clearInterval(v2ElapsedTimer);
+    overlayV2.classList.remove('visible');
+    setTimeout(()=>overlayV2.classList.remove('open'), 250);
+  }
+
+  // =======================================================================
+  // V3 — "Dashboard": a polished recreation of the reference screenshot.
+  // Fully independent state/engine from V1 and V2 — same underlying
+  // schedule scenario (same employees, same stage narrative) as V1, but a
+  // completely fresh set of rendering functions and DOM.
+  // =======================================================================
+  const ROW_COLORS_V3 = [
+    {bg:'#8b5cf6', text:'#ffffff'}, // purple
+    {bg:'#3b82f6', text:'#ffffff'}, // blue
+    {bg:'#f7b21b', text:'#ffffff'}, // amber
+  ];
+  const V3_ICONS = ['calendar','download','puzzle','users','scissors','arrow-right-left','calendar','star','layers','check'];
+  const STAGES_V3 = STAGES.map((s, i)=>({ icon:V3_ICONS[i], title:s.title, sub:s.sub }));
+
+  const v3RowEls = {};
+  const v3BlockEls = {};
+  const v3Blocks = {};
+  const v3RowColorMap = {};
+  let cancelledV3 = false;
+  let v3StartTime = 0;
+  let v3Timer = null;
+  let v3ActivePendingEl = null;
+  let v3SwapCount = 0;
+  let v3FragmentMergeCount = 0;
+  const V3_ESTIMATED_MS = 42000;
+
+  const overlayV3 = document.getElementById('overlayV3');
+  const modalV3   = document.getElementById('modalV3');
+  const v3Ruler   = document.getElementById('v3Ruler');
+  const v3RowsHost= document.getElementById('v3RowsHost');
+  const v3LogList = document.getElementById('v3LogList');
+  const v3Stepper = document.getElementById('v3Stepper');
+  const v3Fill    = document.getElementById('v3Fill');
+  const v3SubStage= document.getElementById('v3SubStage');
+  const v3KpiForecast = document.getElementById('v3KpiForecast');
+  const v3KpiScheduled= document.getElementById('v3KpiScheduled');
+  const v3KpiEmployees= document.getElementById('v3KpiEmployees');
+  const v3KpiOpen = document.getElementById('v3KpiOpen');
+  const v3StepCounter = document.getElementById('v3StepCounter');
+  const v3StepSub = document.getElementById('v3StepSub');
+  const v3ProgressFill = document.getElementById('v3ProgressFill');
+  const v3Remaining = document.getElementById('v3Remaining');
+  const v3RunningPill = document.getElementById('v3RunningPill');
+
+  function v3Wait(ms){
+    return new Promise(res=>{
+      const t = setTimeout(res, ms);
+      if(cancelledV3){ clearTimeout(t); res(); }
+    });
+  }
+
+  function v3AnimateNumber(el, from, to, isHrs){
+    const start = performance.now();
+    const dur = 550;
+    function step(now){
+      const t = Math.min(1, (now-start)/dur);
+      const eased = 1 - Math.pow(1-t, 3);
+      const val = from + (to-from)*eased;
+      el.textContent = isHrs ? val.toFixed(1) : Math.round(val);
+      if(t < 1 && !cancelledV3) requestAnimationFrame(step);
+      else el.textContent = isHrs ? to.toFixed(1) : to;
+    }
+    requestAnimationFrame(step);
+  }
+
+  function v3ComputeScheduledHours(){
+    let total = 0;
+    ROWS.forEach(r=>{
+      if(r.tray) return;
+      Object.values(v3Blocks).forEach(b=>{
+        if(b.rowId === r.id && (b.status==='standard' || b.status==='assigned' || b.status==='priority')) total += (b.end-b.start)/4;
+      });
+    });
+    return total;
+  }
+  function v3ComputeOpenShifts(){
+    return Object.values(v3Blocks).filter(b=>b.status==='variable' || b.status==='merged').length;
+  }
+  function v3ComputeEmployeesAssigned(){
+    return ROWS.filter(r=>!r.tray).filter(r=>
+      Object.values(v3Blocks).some(b=>b.rowId === r.id && (b.status==='standard' || b.status==='assigned' || b.status==='priority'))
+    ).length;
+  }
+  function v3UpdateKPIs(){
+    v3AnimateNumber(v3KpiScheduled, parseFloat(v3KpiScheduled.textContent)||0, v3ComputeScheduledHours(), true);
+    v3AnimateNumber(v3KpiEmployees, parseInt(v3KpiEmployees.textContent)||0, v3ComputeEmployeesAssigned(), false);
+    v3AnimateNumber(v3KpiOpen, parseInt(v3KpiOpen.textContent)||0, v3ComputeOpenShifts(), false);
+  }
+
+  function v3Log(iconName, variant, title, subtitle){
+    // a finished "working on it" line settles into a green check
+    if(v3ActivePendingEl){
+      const done = v3ActivePendingEl;
+      done.classList.remove('pending'); done.classList.add('good');
+      done.innerHTML = icon('check');
+      const it = done.closest('.v3-log-item'); if(it) it.classList.remove('is-pending');
+      v3ActivePendingEl = null;
+    }
+    const isPending = variant === 'head';
+    const colorClass = isPending ? 'pending' : (variant || 'info');
+    const displayIcon = isPending ? 'loader' : (colorClass === 'good' ? 'check' : iconName);
+    const item = document.createElement('div');
+    item.className = 'v3-log-item' + (isPending ? ' is-pending' : '');
+    const timeStr = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:true});
+    item.innerHTML =
+      '<span class="v3-log-icon '+colorClass+'">'+icon(displayIcon)+'</span>'+
+      '<div class="v3-log-body">'+
+        '<div class="v3-log-row1"><span class="v3-log-text">'+title+'</span><span class="v3-log-time">'+timeStr+'</span></div>'+
+        (subtitle ? '<div class="v3-log-sub">'+subtitle+'</div>' : '')+
+      '</div>';
+    v3LogList.appendChild(item);
+    if(window.lucide) lucide.createIcons();
+    v3LogList.scrollTop = v3LogList.scrollHeight;
+    if(isPending) v3ActivePendingEl = item.querySelector('.v3-log-icon');
+  }
+
+  function v3BuildStaticDOM(){
+    v3Ruler.innerHTML = '';
+    for(let h=6; h<=22; h+=2){
+      const idx = (h-6)*4;
+      const s = document.createElement('span');
+      s.style.left = pct(idx);
+      s.textContent = fmtTime(idx).replace(':00','');
+      v3Ruler.appendChild(s);
+    }
+    v3RowsHost.innerHTML = '';
+    let empIdx = 0;
+    ROWS.forEach(r=>{
+      const wrap = document.createElement('div');
+      wrap.className = 'row-block';
+      if(r.tray){
+        wrap.innerHTML = '<div class="row-label">Unassigned<small>leftover fragments</small></div>';
+      } else {
+        const c = ROW_COLORS_V3[empIdx % ROW_COLORS_V3.length];
+        v3RowColorMap[r.id] = c;
+        empIdx++;
+        wrap.innerHTML = '<div class="row-label row-label-emp"><span class="row-avatar" style="background:'+c.bg+';color:'+c.text+'">'+r.id+'</span><span class="row-skel"><span></span><span></span></span></div>';
+      }
+      const grid = document.createElement('div');
+      grid.className = 'grid-row' + (r.tray ? ' tray-row' : '');
+      grid.id = 'v3grid-' + r.id;
+      wrap.appendChild(grid);
+      // the "Unassigned" row stays fully functional for the animation (blocks
+      // still live and move through it) but isn't shown — matches the
+      // reference, which only displays named employees, and frees up the
+      // vertical room those employee rows need to fit without scrolling.
+      // Collapsed to zero height (not display:none) so it still has a real
+      // position for showActionIndicator's rect math to anchor to.
+      if(r.tray){ wrap.style.height = '0'; wrap.style.overflow = 'hidden'; wrap.style.marginBottom = '0'; }
+      v3RowsHost.appendChild(wrap);
+      v3RowEls[r.id] = grid;
+    });
+  }
+
+  function v3BlockInner(def){
+    const label = def.customLabel ? '<span class="block-time">'+def.customLabel+'</span>' : '';
+    return label + '<span class="break-marker" id="v3brk-'+def.id+'">'+icon('coffee')+'</span>';
+  }
+  function v3ClassNameFor(def){
+    let c = 'shift-block status-' + def.status;
+    if(def.priority) c += ' priority-glow';
+    return c;
+  }
+  function v3ApplyRowColor(el, def){
+    const owned = def.status === 'standard' || def.status === 'assigned' || def.status === 'priority';
+    const c = owned ? v3RowColorMap[def.rowId] : null;
+    if(c){ el.style.background = c.bg; el.style.color = c.text; }
+    else { el.style.background = ''; el.style.color = ''; }
+  }
+  function v3AddBlock(rowId, def, opts){
+    opts = opts || {};
+    const row = v3RowEls[rowId];
+    const el = document.createElement('div');
+    def.rowId = rowId;
+    el.className = v3ClassNameFor(def);
+    el.id = 'v3blk-' + def.id;
+    el.style.left = pct(def.start);
+    el.style.width = pct(def.end - def.start);
+    el.innerHTML = v3BlockInner(def);
+    v3ApplyRowColor(el, def);
+    if(opts.animate !== false){ el.style.opacity = '0'; el.style.transform = 'scale(.85)'; }
+    row.appendChild(el);
+    if(window.lucide) lucide.createIcons();
+    v3Blocks[def.id] = def;
+    v3BlockEls[def.id] = el;
+    if(opts.animate !== false){
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ el.style.opacity = '1'; el.style.transform = 'scale(1)'; }));
+    }
+    v3UpdateKPIs();
+    return el;
+  }
+  function v3UpdateBlock(id, patch){
+    const def = v3Blocks[id];
+    if(!def) return;
+    Object.assign(def, patch);
+    const el = v3BlockEls[id];
+    if(!el) return;
+    if(patch.start !== undefined) el.style.left = pct(def.start);
+    if(patch.end !== undefined) el.style.width = pct(def.end - def.start);
+    if(patch.status !== undefined || patch.priority !== undefined){
+      el.className = v3ClassNameFor(def);
+      v3ApplyRowColor(el, def);
+    }
+    if(patch.customLabel !== undefined || patch.end !== undefined || patch.start !== undefined){
+      const hadBreak = el.querySelector('.break-marker.show');
+      el.innerHTML = v3BlockInner(def);
+      if(window.lucide) lucide.createIcons();
+      if(hadBreak) el.querySelector('.break-marker').classList.add('show');
+    }
+    v3UpdateKPIs();
+  }
+  function v3Flash(id){
+    // called as v3Flash('v3blk-'+rawId) everywhere — look up by the DOM id
+    // attribute, not the v3BlockEls dictionary (which is keyed by rawId)
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.classList.add('flash');
+    setTimeout(()=>el.classList.remove('flash'), 1000);
+  }
+  function v3RemoveBlock(id){
+    const el = v3BlockEls[id];
+    if(!el) return;
+    el.style.opacity = '0';
+    el.style.transform = 'scale(.8)';
+    setTimeout(()=>{
+      el.remove();
+      delete v3BlockEls[id];
+      delete v3Blocks[id];
+      v3UpdateKPIs();
+    }, 460);
+  }
+  function v3AddBreak(id){
+    // called as v3AddBreak('v3blk-'+rawId) everywhere — same fix as v3Flash() above
+    const el = document.getElementById(id);
+    if(!el) return;
+    const marker = el.querySelector('.break-marker');
+    if(marker) marker.classList.add('show');
+  }
+  function v3MoveBlockToRow(id, newRowId, patch){
+    const def = v3Blocks[id];
+    const el = v3BlockEls[id];
+    if(!def || !el || !v3RowEls[newRowId]) return;
+    el.style.opacity = '.2';
+    el.style.transform = 'scale(.9)';
+    setTimeout(()=>{
+      if(patch){
+        Object.assign(def, patch);
+        el.className = v3ClassNameFor(def);
+      }
+      def.rowId = newRowId;
+      v3RowEls[newRowId].appendChild(el);
+      v3ApplyRowColor(el, def);
+      el.style.opacity = '1';
+      el.style.transform = 'scale(1)';
+      v3UpdateKPIs();
+    }, 280);
+  }
+  function v3ShowActionIndicator(rowIdA, rowIdB, atIdx, iconName, color, glow){
+    const container = v3RowsHost;
+    const rowA = v3RowEls[rowIdA];
+    const rowB = v3RowEls[rowIdB] || rowA;
+    if(!rowA) return;
+    const hostRect = container.getBoundingClientRect();
+    const aRect = rowA.getBoundingClientRect();
+    const bRect = rowB.getBoundingClientRect();
+    // shifted up from the row's true center so the badge floats clearly
+    // above the shift bars instead of sitting on top of / behind them
+    const top = ((aRect.top + bRect.top)/2 + aRect.height/2) - hostRect.top - 18;
+    const left = (atIdx/TOTAL_IDX) * aRect.width;
+    const span = document.createElement('div');
+    span.className = 'swap-indicator';
+    if(color) span.style.setProperty('--ind-color', color);
+    if(glow) span.style.setProperty('--ind-glow', glow);
+    span.innerHTML = icon(iconName || 'arrow-left-right');
+    span.style.top = top + 'px';
+    span.style.left = left + 'px';
+    container.style.position = 'relative';
+    container.appendChild(span);
+    if(window.lucide) lucide.createIcons();
+    requestAnimationFrame(()=>span.classList.add('show'));
+    setTimeout(()=>span.remove(), 1400);
+  }
+
+  function v3BuildStepper(){
+    v3Stepper.querySelectorAll('.v3-step').forEach(n=>n.remove());
+    STAGES_V3.forEach((s, i)=>{
+      const el = document.createElement('div');
+      el.className = 'v3-step';
+      el.id = 'v3step-' + i;
+      el.innerHTML = '<div class="v3-step-circle">'+icon(s.icon)+'</div><div class="v3-step-label">'+s.title+'</div><div class="v3-step-pill">'+(i+1)+'</div>';
+      v3Stepper.appendChild(el);
+    });
+    if(window.lucide) lucide.createIcons();
+  }
+  function v3SetStage(i){
+    STAGES_V3.forEach((s, idx)=>{
+      const el = document.getElementById('v3step-' + idx);
+      el.classList.remove('active', 'done');
+      if(idx < i) el.classList.add('done');
+      else if(idx === i) el.classList.add('active');
+    });
+    const pctFill = (i/(STAGES_V3.length-1))*100;
+    v3Fill.style.width = 'calc((100% - 104px) * ' + (pctFill/100) + ')';
+    v3StepCounter.textContent = 'Step ' + (i+1) + ' of ' + STAGES_V3.length;
+    v3StepSub.textContent = STAGES_V3[i].sub + '…';
+    v3SubStage.textContent = STAGES_V3[i].title + ' — ' + STAGES_V3[i].sub;
+    v3ProgressFill.style.width = ((i)/(STAGES_V3.length))*100 + '%';
+  }
+
+  // ---------------------------------------------------------------------
+  // V3 stage scripts — same schedule scenario/story as V1
+  // ---------------------------------------------------------------------
+  async function v3Stage0(){
+    v3Log('calendar-check', 'head', 'Reading Scheduling Day Sequence…');
+    await v3Wait(600);
+    v3Log('info', 'info', 'No custom sequence defined', 'Scheduling from the start of the week');
+    await v3Wait(400);
+    v3Log('check-circle-2', 'good', 'Day order set', 'Mon → Tue → Wed → Thu → Fri');
+    await v3Wait(500);
+  }
+  async function v3Stage1(){
+    v3Log('download', 'head', 'Importing standard shifts…');
+    await v3Wait(400);
+    v3AddBlock('JD', {id:'v3-JD-A', start:8,  end:24, status:'standard'});
+    v3AddBlock('AS', {id:'v3-AS-A', start:8,  end:24, status:'standard'});
+    v3Log('file-text', 'info', '2 standard shifts imported for the morning');
+    await v3Wait(500);
+    v3AddBlock('RT', {id:'v3-RT-A', start:8,  end:20, status:'standard'});
+    v3AddBlock('LB', {id:'v3-LB-A', start:8,  end:24, status:'standard'});
+    v3Log('file-text', 'info', '2 more standard shifts imported');
+    await v3Wait(500);
+    v3AddBlock('JD', {id:'v3-JD-B', start:28, end:52, status:'standard'});
+    v3AddBlock('AS', {id:'v3-AS-B', start:28, end:48, status:'standard'});
+    v3Log('file-text', 'info', 'Afternoon standard shifts imported');
+    await v3Wait(500);
+    v3AddBlock('NV', {id:'v3-NV-A', start:16, end:44, status:'standard'});
+    v3AddBlock('OW', {id:'v3-OW-A', start:32, end:44, status:'standard'});
+    v3Log('file-text', 'info', '2 more standard shifts imported');
+    await v3Wait(600);
+    v3Log('alert-triangle', 'warn', 'One shift exceeds forecasted hours', 'Will be reduced later');
+    await v3Wait(500);
+  }
+  async function v3Stage2(){
+    v3Log('settings', 'head', 'Calculating Need = Projected − Scheduled…');
+    await v3Wait(500);
+    v3AddBlock('tray', {id:'v3-gap-mk', start:14, end:22, status:'variable'});
+    v3AddBlock('tray', {id:'v3-gap-kp-a', start:36, end:40, status:'variable'});
+    v3AddBlock('tray', {id:'v3-gap-kp-b', start:40, end:44, status:'variable'});
+    v3AddBlock('tray', {id:'v3-gap-ts', start:48, end:52, status:'variable'});
+    v3AddBlock('tray', {id:'v3-frag-a', start:4,  end:10, status:'variable'});
+    v3AddBlock('tray', {id:'v3-frag-b', start:26, end:32, status:'variable'});
+    v3Log('archive', 'info', '4 open shifts + 2 residual fragments queued to Unassigned');
+    await v3Wait(700);
+    v3Log('settings', 'head', 'Combining open shifts within the continuity window…');
+    await v3Wait(500);
+    v3ShowActionIndicator('tray', 'tray', 40, 'link-2', '#3b82f6', 'rgba(59,130,246,.5)');
+    await v3Wait(650);
+    v3UpdateBlock('v3-gap-kp-a', {end:44});
+    await v3Wait(180);
+    v3RemoveBlock('v3-gap-kp-b');
+    v3Log('link-2', 'good', 'Merged 2 open shifts', 'Single 2h shift');
+    await v3Wait(500);
+  }
+  async function v3Stage3(){
+    v3Log('users', 'head', 'Ranking employees by availability, skill & pay rate…');
+    await v3Wait(550);
+    v3ShowActionIndicator('tray', 'MK', 18, 'user-check', '#22c55e', 'rgba(34,197,94,.5)');
+    await v3Wait(650);
+    v3MoveBlockToRow('v3-gap-mk', 'MK', {status:'assigned'});
+    v3Flash('v3blk-v3-gap-mk');
+    v3Log('check-circle-2', 'good', 'Open shift assigned to MK', 'Lowest availability overlap');
+    await v3Wait(700);
+    v3ShowActionIndicator('tray', 'KP', 40, 'user-check', '#22c55e', 'rgba(34,197,94,.5)');
+    await v3Wait(650);
+    v3MoveBlockToRow('v3-gap-kp-a', 'KP', {status:'assigned'});
+    v3Flash('v3blk-v3-gap-kp-a');
+    v3Log('check-circle-2', 'good', 'Open shift assigned to KP', 'Best skill on job code');
+    await v3Wait(600);
+  }
+  async function v3Stage4(){
+    v3Log('scissors', 'head', 'Checking scheduled hours against forecast…');
+    await v3Wait(600);
+    v3Log('alert-triangle', 'warn', "JD's shift exceeds forecast by 1h");
+    await v3Wait(500);
+    v3Flash('v3blk-v3-JD-B');
+    v3ShowActionIndicator('JD', 'tray', 48, 'scissors', '#ef4444', 'rgba(239,68,68,.5)');
+    await v3Wait(650);
+    v3UpdateBlock('v3-JD-B', {end:48});
+    await v3Wait(200);
+    v3AddBlock('tray', {id:'v3-frag-c', start:36, end:40, status:'variable'});
+    v3Log('minus-circle', 'good', 'Trimmed 1h from the boundary', 'Moved to Unassigned');
+    await v3Wait(600);
+  }
+  async function v3Stage5(){
+    v3Log('repeat', 'head', 'Evaluating shift swaps for better skill coverage…');
+    await v3Wait(600);
+    v3ToggleGlow('v3-NV-A', true); v3ToggleGlow('v3-OW-A', true);
+    await v3Wait(400);
+    v3ShowActionIndicator('NV', 'OW', 38, 'arrow-left-right', '#8b5cf6', 'rgba(139,92,246,.5)');
+    await v3Wait(750);
+    v3MoveBlockToRow('v3-NV-A', 'OW');
+    v3MoveBlockToRow('v3-OW-A', 'NV');
+    v3SwapCount++;
+    await v3Wait(500);
+    v3ToggleGlow('v3-NV-A', false); v3ToggleGlow('v3-OW-A', false);
+    v3Log('check-circle-2', 'good', 'Swapped NV ⇄ OW', 'Best skill level now covers the overlap');
+    await v3Wait(500);
+  }
+  function v3ToggleGlow(id, on){ const el = v3BlockEls[id]; if(el) el.classList.toggle('swap-glow', on); }
+  async function v3Stage6(){
+    v3Log('calendar', 'head', 'Calculating minimum / maximum / ideal break index for each shift…');
+    await v3Wait(700);
+    const order = [
+      ['v3-JD-A','calendar-check','Meal break placed at 10:00'],
+      ['v3-RT-A','coffee','Rest break placed at 09:30'],
+      ['v3-AS-B','utensils','Meal break placed at 16:15'],
+    ];
+    for(const [id, ic, note] of order){
+      v3Flash('v3blk-'+id);
+      v3AddBreak('v3blk-'+id);
+      v3Log(ic, 'info', note);
+      await v3Wait(420);
+    }
+    v3Log('check-circle-2', 'good', order.length + ' breaks placed on the qualifying shifts');
+    await v3Wait(500);
+  }
+  async function v3Stage7(){
+    v3Log('star', 'head', 'Building Gain-Shift and Lose-Shift employee lists…');
+    await v3Wait(600);
+    v3ShowActionIndicator('tray', 'TS', 50, 'star', '#8b5cf6', 'rgba(139,92,246,.5)');
+    await v3Wait(650);
+    v3MoveBlockToRow('v3-gap-ts', 'TS', {status:'priority', priority:true});
+    v3AddBreak('v3blk-v3-gap-ts');
+    v3Flash('v3blk-v3-gap-ts');
+    v3Log('check-circle-2', 'good', 'TS selected via Employee Prioritization', 'High availability & skill');
+    await v3Wait(600);
+  }
+  async function v3Stage8(){
+    v3Log('layers', 'head', 'Scanning Unassigned for combinable fragments…');
+    await v3Wait(600);
+    v3ShowActionIndicator('tray', 'tray', 12, 'link-2', '#3b82f6', 'rgba(59,130,246,.5)');
+    await v3Wait(650);
+    v3UpdateBlock('v3-frag-c', {start:10, end:14});
+    await v3Wait(600);
+    v3UpdateBlock('v3-frag-a', {end:14});
+    await v3Wait(160);
+    v3RemoveBlock('v3-frag-c');
+    await v3Wait(500);
+    v3ShowActionIndicator('tray', 'tray', 17, 'link-2', '#3b82f6', 'rgba(59,130,246,.5)');
+    await v3Wait(650);
+    v3UpdateBlock('v3-frag-b', {start:14, end:20});
+    await v3Wait(600);
+    v3UpdateBlock('v3-frag-a', {end:20, customLabel:'Merged Fragment (4h)'});
+    await v3Wait(160);
+    v3RemoveBlock('v3-frag-b');
+    v3FragmentMergeCount = 3;
+    v3Log('check-circle-2', 'good', 'Combined 3 fragments into a single 4h block');
+    await v3Wait(600);
+  }
+  async function v3Stage9(){
+    v3Log('check-circle-2', 'head', 'Validating the schedule against labor law rules…');
+    await v3Wait(700);
+    v3Log('check-circle-2', 'good', 'No compliance violations found');
+    await v3Wait(500);
+  }
+
+  const V3_STAGE_FUNCS = [v3Stage0, v3Stage1, v3Stage2, v3Stage3, v3Stage4, v3Stage5, v3Stage6, v3Stage7, v3Stage8, v3Stage9];
+
+  async function runAllV3(){
+    for(let i = 0; i < V3_STAGE_FUNCS.length; i++){
+      if(cancelledV3) return;
+      v3SetStage(i);
+      await V3_STAGE_FUNCS[i]();
+      if(cancelledV3) return;
+      await v3Wait(250);
+    }
+    if(cancelledV3) return;
+    onCompleteV3();
+  }
+
+  function onCompleteV3(){
+    v3SetStage(V3_STAGE_FUNCS.length - 1);
+    v3ProgressFill.style.width = '100%';
+    v3Fill.style.width = 'calc(100% - 104px)';
+    v3Remaining.textContent = 'Complete';
+    v3RunningPill.innerHTML = '<span class="v3-running-dot"></span>Complete';
+    document.getElementById('cancelBtnV3').innerHTML = '<i data-lucide="check"></i> Close';
+    if(window.lucide) lucide.createIcons();
+    clearInterval(v3Timer);
+  }
+
+  function resetStateV3(){
+    cancelledV3 = false;
+    v3SwapCount = 0;
+    v3FragmentMergeCount = 0;
+    v3ActivePendingEl = null;
+    Object.keys(v3BlockEls).forEach(id=>{ v3BlockEls[id].remove(); });
+    Object.keys(v3Blocks).forEach(k=>delete v3Blocks[k]);
+    Object.keys(v3BlockEls).forEach(k=>delete v3BlockEls[k]);
+    v3LogList.innerHTML = '';
+    v3KpiScheduled.textContent = '0';
+    v3KpiEmployees.textContent = '0';
+    v3KpiOpen.textContent = '0';
+    v3KpiForecast.textContent = FORECAST_TOTAL;
+    v3RunningPill.innerHTML = '<span class="v3-running-dot"></span>Running';
+    document.getElementById('cancelBtnV3').innerHTML = '<i data-lucide="x"></i> Cancel';
+    if(window.lucide) lucide.createIcons();
+    v3BuildStaticDOM();
+    v3BuildStepper();
+    v3SetStage(0);
+    v3StartTime = performance.now();
+    clearInterval(v3Timer);
+    v3Timer = setInterval(()=>{
+      const elapsed = performance.now() - v3StartTime;
+      const remaining = Math.max(0, (V3_ESTIMATED_MS - elapsed) / 1000);
+      v3Remaining.textContent = remaining.toFixed(1) + 's';
+    }, 100);
+  }
+
+  function openModalV3(){
+    overlayV3.classList.add('open');
+    requestAnimationFrame(()=>overlayV3.classList.add('visible'));
+    resetStateV3();
+    runAllV3();
+  }
+  function closeModalV3(silent){
+    const isComplete = v3Remaining.textContent === 'Complete';
+    if(!isComplete && !silent){
+      const ok = confirm('AI Schedule is still running. Cancel and close?');
+      if(!ok) return;
+      cancelledV3 = true;
+    }
+    clearInterval(v3Timer);
+    overlayV3.classList.remove('visible');
+    setTimeout(()=>overlayV3.classList.remove('open'), 250);
+  }
+
+  document.getElementById('closeBtnV3').addEventListener('click', ()=>closeModalV3(false));
+  document.getElementById('cancelBtnV3').addEventListener('click', ()=>closeModalV3(false));
+  document.getElementById('themeToggleV3').addEventListener('click', toggleTheme);
+
+  // ---------------------------------------------------------------------
+  // Feature flags — a versioned registry (v1, v2, v3 …). Exactly one is
+  // active at a time; the Settings panel lists whatever is registered here.
+  // ---------------------------------------------------------------------
+  const UI_VERSIONS = [
+    { id:'v1', label:'V1 — Classic Grid', desc:'Day-by-day schedule grid with a live activity log.', open: openModal },
+    { id:'v2', label:'V2 — Aurora', desc:'An animated gradient banner with a phase-by-phase checklist.', open: openModalV2 },
+    { id:'v3', label:'V3 — Dashboard', desc:'A colorful KPI dashboard with live activity feed and schedule pad.', open: openModalV3 },
+  ];
+
+  function getUIFlag(){
+    try{
+      const v = localStorage.getItem('aiSchedulingUIVersion');
+      return UI_VERSIONS.some(u=>u.id === v) ? v : UI_VERSIONS[0].id;
+    }catch(e){ return UI_VERSIONS[0].id; }
+  }
+  function setUIFlag(v){
+    try{ localStorage.setItem('aiSchedulingUIVersion', v); }catch(e){}
+  }
+
+  function buildVersionSettings(){
+    const list = document.getElementById('settingsVersionList');
+    list.innerHTML = UI_VERSIONS.map(v=>
+      '<label class="version-row">'
+      + '<input type="radio" name="uiVersion" value="' + v.id + '">'
+      + '<span class="version-radio"></span>'
+      + '<span class="version-text"><span class="version-title">' + v.label + '</span><span class="version-desc">' + v.desc + '</span></span>'
+      + '</label>'
+    ).join('');
+    list.querySelectorAll('input[name="uiVersion"]').forEach(inp=>{
+      inp.addEventListener('change', ()=>{ if(inp.checked) setUIFlag(inp.value); });
+    });
+    const current = getUIFlag();
+    const match = list.querySelector('input[value="' + current + '"]') || list.querySelector('input');
+    if(match) match.checked = true;
+  }
+
+  // ---------------------------------------------------------------------
+  // Wire up
+  // ---------------------------------------------------------------------
+  document.getElementById('runBtn').addEventListener('click', ()=>{
+    // Version picker is hidden for now — default (and only reachable) version is V1.
+    // Restore this to re-enable picking a version via the (commented-out) settings icon:
+    //   const active = UI_VERSIONS.find(v=>v.id === getUIFlag()) || UI_VERSIONS[0];
+    //   active.open();
+    openModal();
+  });
+  document.getElementById('cancelBtnV2').addEventListener('click', ()=>closeModalV2(false));
+  document.getElementById('closeBtnV2').addEventListener('click', ()=>closeModalV2(false));
+  replayBtnV2.addEventListener('click', ()=>{ resetV2(); runAllV2(); });
+  document.getElementById('closeBtn').addEventListener('click', ()=>closeModal(false));
+  document.getElementById('cancelBtn').addEventListener('click', ()=>closeModal(false));
+  document.getElementById('replayBtn').addEventListener('click', ()=>{ resetState(); runAll(); });
+  document.getElementById('viewBtn').addEventListener('click', ()=>closeModal(true));
+  themeToggleOuter.addEventListener('click', toggleTheme);
+  themeToggleModal.addEventListener('click', toggleTheme);
+
+  // Settings icon is hidden (see the commented-out markup above), so its
+  // wiring is commented out too — the elements it references don't exist
+  // in the DOM right now. Uncomment together with the markup to bring it back.
+  // settingsBtn.addEventListener('click', (e)=>{
+  //   e.stopPropagation();
+  //   settingsPanel.classList.toggle('open');
+  // });
+  // document.addEventListener('click', (e)=>{
+  //   if(!settingsPanel.contains(e.target) && e.target !== settingsBtn){
+  //     settingsPanel.classList.remove('open');
+  //   }
+  // });
+  // buildVersionSettings();
+
+  // initial paint so the grid isn't empty before first run
+  applyTheme(getStoredTheme() === 'dark' ? 'dark' : 'light');
+  buildStaticDOM();
+  buildStepper();
+  kpiForecast.textContent = FORECAST_TOTAL;
+})();
+</script>
+</body>
+</html>
