@@ -3,6 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+  // On reload, browsers try to restore the previous scroll offset before the
+  // page has fully laid out. If the last session ended taller (a modal/stats
+  // screen open) than the fresh, short trigger-card page, the browser starts
+  // scrolled down and then snaps back up once it realizes there's nothing to
+  // scroll to — reading as the card "jumping up" right after landing. Turning
+  // restoration off and forcing scrollTop=0 as early as possible prevents it.
+  if('scrollRestoration' in history){ history.scrollRestoration = 'manual'; }
+  window.scrollTo(0, 0);
+</script>
 <title>AI Scheduling — Run Animation</title>
 <style>
   :root{
@@ -92,6 +102,10 @@
     font-size:15px; display:flex; align-items:center; justify-content:center;
     transition:background .15s, color .15s, transform .15s;
   }
+  /* Same reserved-footprint fix as .run-btn: the toggle is a fixed 34x34 box
+     so it never resizes, but reserve the icon size anyway to avoid any
+     sub-pixel content jump inside it while Lucide loads. */
+  .theme-toggle i[data-lucide]{ display:inline-block; width:16px; height:16px; }
   .theme-toggle:hover{ background:var(--surface-raised-hover); color:var(--text); transform:translateY(-1px); }
 
   .top-controls{ position:fixed; top:20px; right:20px; z-index:40; display:flex; align-items:center; gap:10px; }
@@ -159,6 +173,10 @@
     gap:9px;
     transition:transform .15s ease, box-shadow .15s ease;
   }
+  /* Reserve the icon's final footprint before Lucide swaps <i> for an <svg> —
+     otherwise the button (and the flex-centered card around it) grows a few
+     px once the icon pops in, and the whole card visibly drifts upward. */
+  .run-btn i[data-lucide]{ display:inline-block; width:16px; height:16px; }
   .run-btn:hover{ transform:translateY(-1px); box-shadow:0 16px 28px -10px rgba(90,80,240,.65); }
   .run-btn:active{ transform:translateY(0); }
 
@@ -262,8 +280,9 @@
   }
   .step{
     position:relative; z-index:2; display:flex; flex-direction:column; align-items:center;
-    width:80px; flex:none;
+    width:80px; flex:none; cursor:pointer;
   }
+  .step:hover .circle{ filter:brightness(1.08); }
   .step .circle{
     width:33px; height:33px; border-radius:50%; background:var(--circle-bg);
     border:2px solid var(--border); display:flex; align-items:center; justify-content:center;
@@ -356,31 +375,31 @@
   .grid-panel{ flex:1; min-width:0; display:flex; flex-direction:column; gap:10px; min-height:0; }
   .grid-card{
     flex:1; background:var(--surface-recessed); border:1px solid var(--border); border-radius:12px;
-    padding:12px 14px 10px; overflow:hidden; min-height:0;
+    padding:10px 14px 8px; overflow-y:auto; min-height:0;
   }
-  .ruler{ position:relative; height:16px; margin:0 0 6px 100px; }
+  .ruler{ position:relative; height:14px; margin:0 0 5px 100px; }
   .ruler span{
     position:absolute; top:0; transform:translateX(-50%); font-size:9.5px; color:var(--text-faint);
     font-variant-numeric:tabular-nums;
   }
-  .row-block{ display:flex; align-items:center; margin-bottom:4px; }
+  .row-block{ display:flex; align-items:center; margin-bottom:3px; }
   .row-block:last-child{ margin-bottom:0; }
   .row-label{
     width:100px; flex:none; padding-right:8px; font-size:11.5px; font-weight:700; color:var(--text-dim);
   }
   .row-label small{ display:block; font-size:9.5px; font-weight:500; color:var(--text-faint); margin-top:1px; }
-  .row-label-emp{ display:flex; align-items:center; gap:7px; }
+  .row-label-emp{ display:flex; align-items:center; gap:6px; }
   .row-avatar{
-    width:22px; height:22px; border-radius:50%; flex:none;
+    width:19px; height:19px; border-radius:50%; flex:none;
     display:flex; align-items:center; justify-content:center;
-    font-size:8px; font-weight:800; letter-spacing:.2px;
+    font-size:7px; font-weight:800; letter-spacing:.2px;
   }
-  .row-skel{ display:flex; flex-direction:column; gap:4px; }
-  .row-skel span{ display:block; height:5px; border-radius:4px; background:var(--surface-raised-hover); }
-  .row-skel span:first-child{ width:46px; }
-  .row-skel span:last-child{ width:28px; }
+  .row-skel{ display:flex; flex-direction:column; gap:3px; }
+  .row-skel span{ display:block; height:4px; border-radius:4px; background:var(--surface-raised-hover); }
+  .row-skel span:first-child{ width:42px; }
+  .row-skel span:last-child{ width:26px; }
   .grid-row{
-    position:relative; flex:1; height:30px; border-radius:7px;
+    position:relative; flex:1; height:26px; border-radius:6px;
     background:
       repeating-linear-gradient(90deg, var(--grid-line) 0, var(--grid-line) 1px, transparent 1px, transparent calc(100%/8));
     background-color:var(--grid-row-bg);
@@ -947,6 +966,7 @@
           </div>
         </div>
         <div class="m-header-right">
+          <button class="m-close" id="pauseBtn" title="Pause"><i data-lucide="pause"></i></button>
           <button class="theme-toggle" id="themeToggleModal" title="Switch to dark theme">
             <i data-lucide="moon" class="icon-moon"></i><i data-lucide="sun" class="icon-sun"></i>
           </button>
@@ -1233,6 +1253,16 @@
   let startTime = 0;
   let elapsedTimer = null;
   let cancelledV2 = false;
+  let paused = false;
+  let pauseStartedAt = 0;
+  let fastForward = false; // true while replaying earlier stages instantly after a step-click jump
+  // Bumped once per resetState() (every fresh run/jump). Delayed mutators
+  // (removeBlock, moveBlockToRow, ...) capture the value live at call time
+  // and re-check it before touching the DOM, so a stale callback from a run
+  // that got superseded by a step-click jump can detect it's stale and bail
+  // — checking `cancelled` alone isn't reliable here since a *new* run
+  // clears `cancelled` back to false before an old callback's delay elapses.
+  let runGen = 0;
 
   // ---------------------------------------------------------------------
   // Small helpers
@@ -1240,8 +1270,21 @@
   function pct(i){ return (i / TOTAL_IDX * 100).toFixed(3) + '%'; }
   function wait(ms){
     return new Promise(res=>{
-      const t = setTimeout(res, ms);
-      if(cancelled) { clearTimeout(t); res(); }
+      if(cancelled){ res(); return; }
+      if(fastForward){ setTimeout(res, 0); return; }
+      let remaining = ms;
+      function tick(){
+        if(cancelled){ res(); return; }
+        if(paused){ setTimeout(tick, 100); return; } // stall without losing remaining time
+        const chunk = Math.min(remaining, 100);
+        const chunkStart = performance.now();
+        setTimeout(()=>{
+          remaining -= (performance.now() - chunkStart);
+          if(cancelled || remaining <= 0) res();
+          else tick();
+        }, chunk);
+      }
+      tick();
     });
   }
   function waitV2(ms){
@@ -1370,7 +1413,11 @@
         el.style.opacity = '0';
         el.style.transform = 'scale(.9)';
       });
-      setTimeout(()=>el.remove(), 450);
+      // routed through wait() (not a raw setTimeout) so a step-click's fast-forward
+      // replay clears skeleton bars instantly instead of leaving them lingering
+      // into a stage that has already moved on (el.remove() is safe even if a
+      // reset already detached it, so no runGen check is needed here)
+      wait(450).then(()=>el.remove());
     });
   }
 
@@ -1447,21 +1494,30 @@
     // attribute, not the blockEls dictionary (which is keyed by rawId)
     const el = document.getElementById(id);
     if(!el) return;
+    const gen = runGen;
     el.classList.add('flash');
-    setTimeout(()=>el.classList.remove('flash'), 1000);
+    // via wait() so a jump-to-stage replay clears the ring instantly instead
+    // of leaving it glowing on a block the target stage already moved past
+    wait(1000).then(()=>{ if(gen === runGen) el.classList.remove('flash'); });
   }
 
   function removeBlock(id){
     const el = blockEls[id];
     if(!el) return;
+    const gen = runGen;
     el.style.opacity = '0';
     el.style.transform = 'scale(.8)';
-    setTimeout(()=>{
+    // via wait(): honors fast-forward (instant during a step-click replay).
+    // Also re-checks runGen before touching anything — if a step-click jump
+    // reset the state while this was pending, `el`/blockEls/blocks all
+    // belong to a torn-down run and must not be mutated.
+    wait(460).then(()=>{
+      if(gen !== runGen) return;
       el.remove();
       delete blockEls[id];
       delete blocks[id];
       updateKPIs();
-    }, 460);
+    });
   }
 
   function addBreak(id){
@@ -1481,9 +1537,14 @@
     const def = blocks[id];
     const el = blockEls[id];
     if(!def || !el || !rowEls[newRowId]) return;
+    const gen = runGen;
     el.style.opacity = '.2';
     el.style.transform = 'scale(.9)';
-    setTimeout(()=>{
+    // via wait(): instant during a step-click's fast-forward replay, and the
+    // runGen check bails if resetState() already tore this run's DOM down
+    // (e.g. a second jump arrived before this 280ms move finished)
+    wait(280).then(()=>{
+      if(gen !== runGen) return;
       if(patch){
         Object.assign(def, patch);
         el.className = classNameFor(def); // safe here: no transient classes (swap-glow, flash) are active during an assign/EPW move
@@ -1494,7 +1555,7 @@
       el.style.opacity = '1';
       el.style.transform = 'scale(1)';
       updateKPIs();
-    }, 280);
+    });
   }
 
   // A floating icon badge that pops between two rows (or twice on the same
@@ -1502,6 +1563,7 @@
   // combining, assigning, trimming, prioritizing… Reused across stages so
   // every "working" moment is visibly announced on the schedule pad.
   function showActionIndicator(rowIdA, rowIdB, atIdx, iconName, color, glow){
+    const gen = runGen;
     const container = rowsHost;
     const rowA = rowEls[rowIdA];
     const rowB = rowEls[rowIdB] || rowA;
@@ -1524,7 +1586,9 @@
     container.appendChild(span);
     if(window.lucide) lucide.createIcons();
     requestAnimationFrame(()=>span.classList.add('show'));
-    setTimeout(()=>span.remove(), 1400);
+    // via wait() so a step-click's fast-forward replay doesn't leave a
+    // floating indicator badge stranded on screen for the full 1.4s
+    wait(1400).then(()=>{ if(gen === runGen) span.remove(); });
   }
 
   // ---------------------------------------------------------------------
@@ -1549,7 +1613,9 @@
       const el = document.createElement('div');
       el.className = 'step';
       el.id = 'step-'+i;
+      el.title = 'Jump to: ' + s.title;
       el.innerHTML = '<div class="circle">'+icon(s.icon)+'</div><div class="label">'+s.title+'</div>';
+      el.addEventListener('click', ()=>jumpToStage(i));
       stepperEl.appendChild(el);
     });
     if(window.lucide) lucide.createIcons();
@@ -1777,14 +1843,18 @@
   // ---------------------------------------------------------------------
   // Runner
   // ---------------------------------------------------------------------
-  async function runAll(){
+  async function runAll(startIndex){
+    cancelled = false;
+    startIndex = startIndex || 0;
     for(let i=0; i<STAGE_FUNCS.length; i++){
       if(cancelled) return;
+      fastForward = i < startIndex; // replay everything before the clicked step instantly
       setStage(i);
       await STAGE_FUNCS[i]();
       if(cancelled) return;
       await wait(250);
     }
+    fastForward = false;
     if(cancelled) return;
     onComplete();
   }
@@ -1836,8 +1906,14 @@
   // Reset + open/close
   // ---------------------------------------------------------------------
   function resetState(){
-    cancelled = false;
+    // NOTE: `cancelled` is intentionally left alone here — runAll() is the
+    // only place that clears it, right before a run actually starts. That
+    // ordering is what lets jumpToStage() safely stop an in-flight run
+    // before this rebuilds the DOM out from under it (see jumpToStage).
+    runGen++; // invalidate any delayed mutator callbacks still in flight from the old run
     completed = false;
+    paused = false;
+    fastForward = false;
     swapCount = 0;
     fragmentMergeCount = 0;
     Object.keys(blockEls).forEach(id=>{ blockEls[id].remove(); });
@@ -1846,6 +1922,9 @@
     logList.innerHTML = '';
     completeLayer.classList.remove('show');
     document.getElementById('cancelBtn').textContent = 'Cancel';
+    const pauseBtn = document.getElementById('pauseBtn');
+    pauseBtn.innerHTML = icon('pause');
+    if(window.lucide) lucide.createIcons();
     kpiScheduled.textContent = '0';
     kpiEmployees.textContent = '0';
     kpiOpen.textContent = '0';
@@ -1855,9 +1934,41 @@
     buildStepper();
     setStage(0);
     startTime = performance.now();
+    clearInterval(elapsedTimer);
     elapsedTimer = setInterval(()=>{
       elapsedText.textContent = ((performance.now()-startTime)/1000).toFixed(1) + 's';
     }, 100);
+  }
+
+  // Jumps straight to stage `targetIndex`: stops whatever is currently
+  // running, then replays every earlier stage near-instantly (via
+  // fastForward in wait()) so the grid/log/KPIs land in the correct state,
+  // and resumes normal-speed animation from targetIndex onward.
+  async function jumpToStage(targetIndex){
+    cancelled = true;
+    await new Promise(r=>setTimeout(r, 0)); // let any in-flight wait() observe cancelled and bail
+    resetState();
+    runAll(targetIndex);
+  }
+
+  function togglePause(){
+    if(completed) return;
+    paused = !paused;
+    const btn = document.getElementById('pauseBtn');
+    if(paused){
+      pauseStartedAt = performance.now();
+      clearInterval(elapsedTimer);
+      btn.innerHTML = icon('play');
+      btn.title = 'Resume';
+    } else {
+      startTime += (performance.now() - pauseStartedAt); // don't count the paused time as elapsed
+      elapsedTimer = setInterval(()=>{
+        elapsedText.textContent = ((performance.now()-startTime)/1000).toFixed(1) + 's';
+      }, 100);
+      btn.innerHTML = icon('pause');
+      btn.title = 'Pause';
+    }
+    if(window.lucide) lucide.createIcons();
   }
 
   function openModal(){
@@ -2708,6 +2819,7 @@
   document.getElementById('closeBtnV2').addEventListener('click', ()=>closeModalV2(false));
   replayBtnV2.addEventListener('click', ()=>{ resetV2(); runAllV2(); });
   document.getElementById('closeBtn').addEventListener('click', ()=>closeModal(false));
+  document.getElementById('pauseBtn').addEventListener('click', togglePause);
   document.getElementById('cancelBtn').addEventListener('click', ()=>closeModal(false));
   document.getElementById('replayBtn').addEventListener('click', ()=>{ resetState(); runAll(); });
   document.getElementById('viewBtn').addEventListener('click', ()=>closeModal(true));
