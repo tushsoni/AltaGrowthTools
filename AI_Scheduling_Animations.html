@@ -1263,24 +1263,34 @@
   // — checking `cancelled` alone isn't reliable here since a *new* run
   // clears `cancelled` back to false before an old callback's delay elapses.
   let runGen = 0;
+  // Holds the in-flight runAll() promise so a jump can await the previous
+  // run actually finishing (see startRun/jumpToStage) instead of just
+  // hoping a single tick was enough for it to notice cancellation.
+  let currentRunPromise = null;
 
   // ---------------------------------------------------------------------
   // Small helpers
   // ---------------------------------------------------------------------
   function pct(i){ return (i / TOTAL_IDX * 100).toFixed(3) + '%'; }
   function wait(ms){
+    // Captured up front: if a later step-click bumps runGen again while this
+    // wait is pending, `cancelled` may already have been reset to false by
+    // that NEWER run by the time our chunk timer fires — so cancelled alone
+    // can't tell a stale run from a live one. Comparing against the gen this
+    // wait started under can.
+    const gen = runGen;
     return new Promise(res=>{
-      if(cancelled){ res(); return; }
+      if(cancelled || gen !== runGen){ res(); return; }
       if(fastForward){ setTimeout(res, 0); return; }
       let remaining = ms;
       function tick(){
-        if(cancelled){ res(); return; }
+        if(cancelled || gen !== runGen){ res(); return; }
         if(paused){ setTimeout(tick, 100); return; } // stall without losing remaining time
         const chunk = Math.min(remaining, 100);
         const chunkStart = performance.now();
         setTimeout(()=>{
           remaining -= (performance.now() - chunkStart);
-          if(cancelled || remaining <= 0) res();
+          if(cancelled || gen !== runGen || remaining <= 0) res();
           else tick();
         }, chunk);
       }
@@ -1374,7 +1384,7 @@
       const wrap = document.createElement('div');
       wrap.className = 'row-block';
       if(r.tray){
-        wrap.innerHTML = '<div class="row-label">Unassigned<small>leftover fragments</small></div>';
+        wrap.innerHTML = '<div class="row-label">Unassigned</div>';
       } else {
         const c = ROW_COLORS[empIdx % ROW_COLORS.length];
         rowColorMap[r.id] = c;
@@ -1844,19 +1854,34 @@
   // Runner
   // ---------------------------------------------------------------------
   async function runAll(startIndex){
+    // Captured right away (resetState() — which bumps runGen — always runs
+    // just before this): identifies THIS invocation. If another step-click
+    // jump supersedes it mid-flight, that jump's resetState() bumps runGen
+    // again, and `cancelled` gets reset to false by ITS runAll() before this
+    // older loop necessarily reaches a checkpoint — so `cancelled` alone
+    // can't be trusted to stop this stale loop; the gen mismatch can.
+    const myGen = runGen;
     cancelled = false;
     startIndex = startIndex || 0;
     for(let i=0; i<STAGE_FUNCS.length; i++){
-      if(cancelled) return;
+      if(cancelled || runGen !== myGen) return;
       fastForward = i < startIndex; // replay everything before the clicked step instantly
       setStage(i);
       await STAGE_FUNCS[i]();
-      if(cancelled) return;
+      if(cancelled || runGen !== myGen) return;
       await wait(250);
     }
     fastForward = false;
-    if(cancelled) return;
+    if(cancelled || runGen !== myGen) return;
     onComplete();
+  }
+
+  // Every entry point that starts a run (open, replay, jump) must go through
+  // this so currentRunPromise always tracks whichever run is actually live —
+  // that's what lets jumpToStage() await the previous run fully finishing.
+  function startRun(startIndex){
+    currentRunPromise = runAll(startIndex);
+    return currentRunPromise;
   }
 
   function onComplete(){
@@ -1946,9 +1971,18 @@
   // and resumes normal-speed animation from targetIndex onward.
   async function jumpToStage(targetIndex){
     cancelled = true;
-    await new Promise(r=>setTimeout(r, 0)); // let any in-flight wait() observe cancelled and bail
+    // Wait for the OLD run to fully unwind (not just one tick) before
+    // rebuilding — a single tick only lets an *already-pending* wait() see
+    // `cancelled`, but the stage function's own code after that wait keeps
+    // running. If a second jump landed while the first was still draining,
+    // resetState() could run out from under a still-executing stage
+    // function, which would then apply stray mutations onto the fresh DOM.
+    // Awaiting the previous run's own promise guarantees it has genuinely
+    // returned first — jumping forward then back stays a clean, single-run
+    // start from wherever you last clicked.
+    if(currentRunPromise) await currentRunPromise;
     resetState();
-    runAll(targetIndex);
+    startRun(targetIndex);
   }
 
   function togglePause(){
@@ -1975,7 +2009,7 @@
     overlay.classList.add('open');
     requestAnimationFrame(()=>overlay.classList.add('visible'));
     resetState();
-    runAll();
+    startRun();
   }
 
   function closeModal(silent){
@@ -2358,7 +2392,7 @@
       const wrap = document.createElement('div');
       wrap.className = 'row-block';
       if(r.tray){
-        wrap.innerHTML = '<div class="row-label">Unassigned<small>leftover fragments</small></div>';
+        wrap.innerHTML = '<div class="row-label">Unassigned</div>';
       } else {
         const c = ROW_COLORS_V3[empIdx % ROW_COLORS_V3.length];
         v3RowColorMap[r.id] = c;
@@ -2821,7 +2855,7 @@
   document.getElementById('closeBtn').addEventListener('click', ()=>closeModal(false));
   document.getElementById('pauseBtn').addEventListener('click', togglePause);
   document.getElementById('cancelBtn').addEventListener('click', ()=>closeModal(false));
-  document.getElementById('replayBtn').addEventListener('click', ()=>{ resetState(); runAll(); });
+  document.getElementById('replayBtn').addEventListener('click', ()=>{ resetState(); startRun(); });
   document.getElementById('viewBtn').addEventListener('click', ()=>closeModal(true));
   themeToggleOuter.addEventListener('click', toggleTheme);
   themeToggleModal.addEventListener('click', toggleTheme);
