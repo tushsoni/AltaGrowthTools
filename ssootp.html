@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SSO OTP Environments</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --surface: #ffffff;
+    --ink: #1c2433;
+    --muted: #5f6b7d;
+    --line: #dde3ec;
+    --hover: #eef2f7;
+    --dev: #2f6fdb;
+    --qa: #148a6b;
+    --cqa: #8a4fd1;
+  }
+  :root[data-theme="dark"] {
+    --bg: #12161f; --surface: #1b212d; --ink: #e6eaf2; --muted: #9aa5b8;
+    --line: #2c3444; --hover: #242c3a; --dev: #7aa7f5; --qa: #4fc9a6; --cqa: #b791ec;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0; }
+  .sub { color: var(--muted); font-size: 13px; margin: 6px 0 20px; }
+  .btn {
+    font: inherit; font-size: 13px; padding: 7px 14px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+    border-radius: 8px; cursor: pointer;
+  }
+  .btn:hover { background: var(--hover); }
+  .btn:focus-visible, .card:focus-visible { outline: 2px solid var(--dev); outline-offset: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .card {
+    display: flex; flex-direction: column; gap: 10px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px; border-top: 4px solid var(--accent);
+  }
+  .card h2 { font-size: 16px; margin: 0; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+  .host { color: var(--muted); font-size: 12px; font-family: Consolas, monospace; word-break: break-all; }
+  .row { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .open {
+    background: var(--accent); color: #fff; border-color: transparent;
+  }
+  :root[data-theme="dark"] .open { color: #10141c; }
+  .open:hover { background: var(--accent); filter: brightness(1.08); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>SSO OTP Environments</h1>
+    <button class="btn" id="theme" type="button">Toggle theme</button>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+  const ENVIRONMENTS = [
+    {
+      id: "dev",
+      name: "DEV SSO OTP",
+      color: "var(--dev)",
+      url: "https://ssodev.altametrics.com/ssodev/admin.html#/eyJmaXJzdE5hbWUiOiJUdXNoYXIiLCJsYXN0TmFtZSI6IlNvbmkiLCJlbWFpbEFkZHJlc3MiOiJ0dXNoYXJAYWx0YW1ldHJpY3MuY29tIiwibGFzdFZlcmlmeUF0IjoiMjAyNi0xMC0wNiAxMzo0OTo1My42NTIiLCJpc1NBTUxMb2dpbiI6dHJ1ZSwidGVhbSI6IkFsdGFtZXRyaWNzIEdyb3d0aCIsImRlcGFydG1lbnQiOiJQUyIsInVzZXJJRCI6InR1c2hhciJ9/adminSamlDetail"
+    },
+    {
+      id: "qa",
+      name: "QA SSO OTP",
+      color: "var(--qa)",
+      url: "https://qasso.altametrics.com/hwsso/admin.html#/eyJmaXJzdE5hbWUiOiJUdXNoYXIiLCJsYXN0TmFtZSI6IlNvbmkiLCJlbWFpbEFkZHJlc3MiOiJ0dXNoYXJAYWx0YW1ldHJpY3MuY29tIiwibGFzdFZlcmlmeUF0IjoiMjAyNi0xMC0wNiAxMzo1MDoyNC4yNjMiLCJpc1NBTUxMb2dpbiI6dHJ1ZSwidGVhbSI6IkFsdGFtZXRyaWNzIEdyb3d0aCIsImRlcGFydG1lbnQiOiJQUyIsInVzZXJJRCI6InR1c2hhciJ9/adminSamlDetail"
+    },
+    {
+      id: "cqa",
+      name: "SSO C QA OTP",
+      color: "var(--cqa)",
+      url: "https://ssocqa.altametrics.com/ssocqa/admin.html#/eyJmaXJzdE5hbWUiOiJUdXNoYXIiLCJsYXN0TmFtZSI6IlNvbmkiLCJlbWFpbEFkZHJlc3MiOiJ0dXNoYXJAYWx0YW1ldHJpY3MuY29tIiwibGFzdFZlcmlmeUF0IjoiMjAyNi0xMC0wNiAxMzo1MDoyNC4yNjMiLCJpc1NBTUxMb2dpbiI6dHJ1ZSwidGVhbSI6IkFsdGFtZXRyaWNzIEdyb3d0aCIsImRlcGFydG1lbnQiOiJQUyIsInVzZXJJRCI6InR1c2hhciJ9/adminSamlDetail"
+    }
+  ];
+
+  // Popup window centred over this page; named target => one popup per environment, reused
+  function openEnv(env) {
+    // Sized to fit the OTP card (~390x470) plus the popup's address bar
+    const w = 480;
+    const h = 640;
+    const left = Math.round(window.screenX + (window.outerWidth - w) / 2);
+    const top = Math.round(window.screenY + (window.outerHeight - h) / 2);
+    const win = window.open(env.url, "sso-" + env.id,
+      "popup,width=" + w + ",height=" + h + ",left=" + left + ",top=" + top);
+    if (win) win.focus();
+  }
+
+  const grid = document.getElementById("grid");
+  ENVIRONMENTS.forEach((env, i) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.setProperty("--accent", env.color);
+    card.innerHTML =
+      '<h2><span class="dot"></span>' + env.name + '</h2>' +
+      '<div class="host">' + new URL(env.url).host + '</div>' +
+      '<div class="row">' +
+        '<button class="btn open" type="button">Open (' + (i + 1) + ')</button>' +
+      '</div>';
+    card.querySelector(".open").addEventListener("click", () => openEnv(env));
+    grid.appendChild(card);
+  });
+
+  document.addEventListener("keydown", (e) => {
+    const env = ENVIRONMENTS[Number(e.key) - 1];
+    if (env && !e.ctrlKey && !e.metaKey && !e.altKey) openEnv(env);
+  });
+
+  const root = document.documentElement;
+  try { const t = localStorage.getItem("sso-theme"); if (t) root.dataset.theme = t; } catch (_) {}
+  document.getElementById("theme").addEventListener("click", () => {
+    root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
+    try { localStorage.setItem("sso-theme", root.dataset.theme); } catch (_) {}
+  });
+</script>
+</body>
+</html>
